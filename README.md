@@ -1,4 +1,4 @@
-# gdtq
+# gdtq -- Double-double, Triple-double, and Quadruple-double precision arithmetic for GPU with CUDA
 ----------------------------------------
 QD library running on CUDA, originated by GQD, but including gtd_real class
 Copyright (c) 2026 Tomonori Kouya

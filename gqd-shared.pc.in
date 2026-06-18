@@ -1,0 +1,14 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+includedir=@includedir@
+
+Name: gqd-shared
+Description: GPU multi-precision arithmetic for CUDA (gdtq) -- shared libgqd.so, host-side API only
+Version: @PACKAGE_VERSION@
+# Shared library: exports the HOST-callable API (GxxStart/GxxEnd and the
+# __host__ __device__ functions usable on the CPU).  It CANNOT supply
+# device code to your own kernels -- use the default gqd.pc (libgqd.a)
+# for GPU kernel code.
+Libs: -L${libdir} -lgqd
+Cflags: -I${includedir}/gdtq -D__NV_NO_VECTOR_DEPRECATION_DIAG

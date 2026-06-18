@@ -1,0 +1,26 @@
+/* SPDX-License-Identifier: BSD-3-Clause */
+/* Copyright (c) 2026 Tomonori Kouya. Based on GQD (Mian Lu) and QD (Bailey et al., LBNL). */
+
+#ifndef __GTD_LOG_CU__
+#define __GTD_LOG_CU__
+
+#include "gqd.cuh"
+
+/* log(a) by Newton's method on f(x) = exp(x) - a:
+ *   x_{n+1} = x_n + a * exp(-x_n) - 1
+ * Quadratic convergence: 53 -> 106 -> 159 bits in two iterations. */
+__device__
+gtd_real log(const gtd_real &a)
+{
+	if (is_one(a))    return make_td(0.0);
+	if (a.x <= 0.0)   return make_td(0.0);   /* TODO: signal NaN/inf */
+
+	gtd_real x = make_td(log(a.x));
+
+	x = x + a * exp(negative(x)) - 1.0;
+	x = x + a * exp(negative(x)) - 1.0;
+
+	return x;
+}
+
+#endif /* __GTD_LOG_CU__ */

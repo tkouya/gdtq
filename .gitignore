@@ -1,0 +1,44 @@
+# --- Compiled / build artifacts ---
+*.o
+*.lo
+*.a
+*.so
+*.so.*
+*.la
+*.dylib
+
+# Test binaries (built from *_kernel.cu / *.cpp)
+/test/benchmark
+/test/sqstest
+
+# --- Autotools-generated files (regenerate with ./bootstrap) ---
+/autom4te.cache/
+/build-aux/
+.deps/
+.dirstamp
+/aclocal.m4
+/configure
+/config.h
+/config.h.in
+/config.log
+/config.status
+/stamp-h1
+Makefile
+Makefile.in
+
+# autotools backup / temporary files
+*~
+config.h.in~
+
+# pkg-config files generated from *.pc.in by ./configure
+/gqd.pc
+/gqd-shared.pc
+
+# --- Distribution tarballs ---
+*.tar.gz
+*.tar.xz
+*.tar.bz2
+
+# Editor / OS noise
+.DS_Store
+*.swp

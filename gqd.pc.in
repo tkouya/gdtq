@@ -1,0 +1,14 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+includedir=@includedir@
+
+Name: gqd
+Description: GPU multi-precision arithmetic for CUDA (DD/TD/QD and float-based DS/TS/QS) -- gdtq, static/device-linkable libgqd.a
+Version: @PACKAGE_VERSION@
+# Static archive linked by full path so the relocatable device code is
+# fed to nvlink and is NOT shadowed by libgqd.so during -l resolution.
+# Use this (the default) for GPU kernel code; compile your kernels with
+# -rdc=true and do the final link through nvcc.
+Libs: ${libdir}/libgqd.a -lcudadevrt
+Cflags: -I${includedir}/gdtq -D__NV_NO_VECTOR_DEPRECATION_DIAG

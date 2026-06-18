@@ -1,0 +1,7 @@
+#!/bin/sh
+# Regenerate the autotools build system. Run this in a fresh checkout
+# (or after editing configure.ac / Makefile.am files) before ./configure.
+set -e
+mkdir -p build-aux m4
+autoreconf --install --force --warnings=all
+echo "Now run: ./configure [options] && make && make install"

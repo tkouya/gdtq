@@ -1,0 +1,76 @@
+#ifndef __GQS_EXP_CU__
+#define __GQS_EXP_CU__
+
+//#include "common.cuh"
+//#include "gqd_exp.cuh"
+#include "gqs.cuh"
+
+__device__
+gqs_real exp( const gqs_real &a ) {
+        gqs_real r;
+        const float k = ldexp(1.0, 16);
+        const float inv_k = 1.0 / k;
+
+        if (a.x <= -709.0) {
+                //return make_qs(0.0);
+                r.x = r.y = r.z = r.w = 0.0;
+                return r;
+        }
+
+        //!!!!!!!!!!!!!!
+        if (a.x >=  709.0) {
+                //return make_qs(0.0);
+                //return qd_inf;
+                r.x = r.y = r.z = r.w = 0.0;
+                return r;
+        }
+
+        if (is_zero(a)) {
+                //return make_qs(1.0);
+                r.x = 1.0;
+                r.y = r.z = r.w = 0.0;
+                return r;
+        }
+
+        if (is_one(a)) {
+                //return _qs_e;
+                /* float precision: only the leading limb is meaningful;
+                   the rest of the QD constant under-flows the float type. */
+                r.x = 2.7182817f;
+                r.y = 8.254840e-08f;
+                r.z = -3.197144e-15f;
+                r.w = 0.0f;
+                
+                return r;
+        }
+
+        float m = floor(a.x/_qs_log2.x + 0.5);
+        r = mul_pwr2(a - _qs_log2 * m, inv_k);
+        gqs_real s, p, t;
+        float thresh = inv_k * _qs_eps;
+
+        p = sqr(r);
+        s = r + mul_pwr2(p, 0.5);
+        int i = 0;
+        do 
+        {
+                p = p * r;
+                t = p * qs_inv_fact[i++];
+                s = s + t;
+        } while ( (fabs(to_float(t)) > thresh) && (i < 9) );
+
+        /* Use a different loop variable name to avoid shadowing the outer 'i'
+           (triggers -Wshadow with recent nvcc/host compilers). */
+        for( int j = 0; j < 16; j++ )
+        {
+                s = mul_pwr2(s, 2.0) + sqr(s);
+        }
+        s = s + 1.0;
+
+        return ldexp(s, int(m));
+}
+
+
+#endif /* __GQS_EXP_CU__ */
+
+

@@ -1,4 +1,3 @@
-# gdtq: Double-double, Triple-double, and Quadruple-double precision arithmetic on GPU (CUDA)
 ================================================
 GDTQ Version 0.0.2
 Copyright (C) 2026 Tomonori Kouya

@@ -67,7 +67,30 @@ gts_real operator*(const gts_real &a, const gts_real &b);
 __device__
 gts_real sqr(const gts_real &a);
 
+/* fused multiply-add */
+/* Branch-free triple-word FMA (T. Kouya):  a * b + c  as one fused
+   operation, without renormalizing a * b on its own. */
+__device__
+gts_real tw_fma(const gts_real &a, const gts_real &b, const gts_real &c);
+
+__device__
+gts_real tw_fma(const gts_real &a, float b, const gts_real &c);
+
+/* Generic spelling; same operation. */
+__device__
+gts_real fma(const gts_real &a, const gts_real &b, const gts_real &c);
+
+__device__
+gts_real fma(const gts_real &a, float b, const gts_real &c);
+
 /* divisions */
+__device__
+gts_real standard_div(const gts_real &a, const gts_real &b);
+
+/* Division built on the branch-free triple-word FMA. */
+__device__
+gts_real fma_div(const gts_real &a, const gts_real &b);
+
 __device__
 gts_real operator/(const gts_real &a, const gts_real &b);
 

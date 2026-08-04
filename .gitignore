@@ -10,6 +10,8 @@
 # Test binaries (built from *_kernel.cu / *.cpp)
 /test/benchmark
 /test/sqstest
+/test/fmatest
+/test/fmabench
 
 # --- Autotools-generated files (regenerate with ./bootstrap) ---
 /autom4te.cache/

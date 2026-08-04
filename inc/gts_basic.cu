@@ -305,6 +305,94 @@ gts_real sqr(const gts_real &a)
 }
 
 /*=================================================================
+ * fused multiply-add
+ *=================================================================*/
+
+// 2026-08-04 T.Kouya
+// Branch free algorithm: triple-word FMA,  z = a * b + c  (float limbs).
+// Same network as the gtd_real version; see gtd_basic.cu.
+__device__
+gts_real tw_fma(const gts_real &a, const gts_real &b, const gts_real &c)
+{
+  float a0, b0, c0, d0, e0, f0, g0;
+  float a1, b1, c1, d1, e1, f1;
+  float a2, b2, c2;
+  float a3, b3;
+  float a4, b4;
+  float a5, b5;
+  float a6, b6;
+
+  /* --- products --- */
+  a0 = two_prod(a.x, b.x, b0);        /* level 0 / level 1 */
+  c0 = two_prod(a.x, b.y, e0);        /* level 1 / level 2 */
+  d0 = two_prod(a.y, b.x, f0);        /* level 1 / level 2 */
+  g0 = a.x * b.z + a.y * b.y + a.z * b.x;   /* level 2 */
+
+  /* --- level 0 --- */
+  a1 = two_sum(a0, c.x, b1);
+
+  /* --- level 1 --- */
+  c1 = two_sum(c0, d0, d1);
+  e1 = two_sum(b0, c.y, f1);
+  a2 = two_sum(c1, e1, b2);
+  a3 = two_sum(a2, b1, b3);
+
+  /* --- level 2 --- */
+  c2 = ((e0 + f0) + (g0 + c.z)) + ((d1 + f1) + (b2 + b3));
+
+  /* --- branch-free renormalization --- */
+  a4 = quick_two_sum(a3, c2, b4);
+  a5 = quick_two_sum(a1, a4, b5);
+  a6 = quick_two_sum(b5, b4, b6);
+
+  return make_ts(a5, a6, b6);
+}
+
+/* triple-word FMA with a plain float multiplier:  a * b + c. */
+__device__
+gts_real tw_fma(const gts_real &a, float b, const gts_real &c)
+{
+  float a0, b0, c0, d0, e0;
+  float a1, b1, c1, d1;
+  float a2, b2;
+  float a3, b3, c3;
+  float a4, b4;
+  float a5, b5;
+  float a6, b6;
+
+  a0 = two_prod(a.x, b, b0);
+  c0 = two_prod(a.y, b, d0);
+  e0 = a.z * b;
+
+  a1 = two_sum(a0, c.x, b1);
+
+  c1 = two_sum(b0, c0, d1);
+  a2 = two_sum(c.y, b1, b2);
+  a3 = two_sum(c1, a2, b3);
+
+  c3 = ((d0 + e0) + c.z) + ((d1 + b2) + b3);
+
+  a4 = quick_two_sum(a3, c3, b4);
+  a5 = quick_two_sum(a1, a4, b5);
+  a6 = quick_two_sum(b5, b4, b6);
+
+  return make_ts(a5, a6, b6);
+}
+
+/* Generic spelling; same operation. */
+__device__
+gts_real fma(const gts_real &a, const gts_real &b, const gts_real &c)
+{
+	return tw_fma(a, b, c);
+}
+
+__device__
+gts_real fma(const gts_real &a, float b, const gts_real &c)
+{
+	return tw_fma(a, b, c);
+}
+
+/*=================================================================
  * divisions
  *=================================================================*/
 
@@ -317,7 +405,7 @@ gts_real sqr(const gts_real &a)
  *   q  = renormalize3(q0, q1, q2, r.x/b.x)
  */
 __device__
-gts_real operator/(const gts_real &a, const gts_real &b)
+gts_real standard_div(const gts_real &a, const gts_real &b)
 {
 	float q0, q1, q2, q3;
 	gts_real r;
@@ -334,6 +422,38 @@ gts_real operator/(const gts_real &a, const gts_real &b)
 	q3 = r.x / b.x;
 
 	return make_ts_renorm(q0, q1, q2, q3);
+}
+
+/* Same correction sequence, but every residual  r <- r - q*b  is one
+   fused tw_fma instead of a multiply followed by a subtraction. */
+__device__
+gts_real fma_div(const gts_real &a, const gts_real &b)
+{
+	float q0, q1, q2, q3;
+	gts_real r;
+
+	q0 = a.x / b.x;
+	r  = tw_fma(b, -q0, a);      /* r = a - q0 * b */
+
+	q1 = r.x / b.x;
+	r  = tw_fma(b, -q1, r);
+
+	q2 = r.x / b.x;
+	r  = tw_fma(b, -q2, r);
+
+	q3 = r.x / b.x;
+
+	return make_ts_renorm(q0, q1, q2, q3);
+}
+
+__device__
+gts_real operator/(const gts_real &a, const gts_real &b)
+{
+#ifdef GQD_NO_FMA_DIV
+	return standard_div(a, b);
+#else
+	return fma_div(a, b);
+#endif
 }
 
 __device__

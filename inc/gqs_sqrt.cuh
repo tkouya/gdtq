@@ -6,6 +6,10 @@
 __device__
 gqs_real sqrt(const gqs_real &a);
 
+/* Reference (0.0.2) implementation, kept for benchmarking. */
+__device__
+gqs_real sqrt_legacy(const gqs_real &a);
+
 #endif /* __GQS_SQRT_CUH__ */
 
 

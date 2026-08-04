@@ -88,9 +88,29 @@ gqs_real operator*(const gqs_real &a, const gqs_real &b);
  __device__
 gqs_real sqr(const gqs_real &a) ;
 
+/** fused multiply-add */
+/* Branch-free quad-word FMA (T. Kouya):  a * b + c  as one fused
+   operation, without renormalizing a * b on its own. */
+__device__
+gqs_real qw_fma(const gqs_real &a, const gqs_real &b, const gqs_real &c);
+
+__device__
+gqs_real qw_fma(const gqs_real &a, float b, const gqs_real &c);
+
+/* Generic spelling; same operation. */
+__device__
+gqs_real fma(const gqs_real &a, const gqs_real &b, const gqs_real &c);
+
+__device__
+gqs_real fma(const gqs_real &a, float b, const gqs_real &c);
+
 /** divisions */
 __device__
 gqs_real sloppy_div(const gqs_real &a, const gqs_real &b);
+
+/* Division built on the branch-free quad-word FMA. */
+__device__
+gqs_real fma_div(const gqs_real &a, const gqs_real &b);
 
 __device__
 gqs_real operator/(const gqs_real &a, const gqs_real &b);

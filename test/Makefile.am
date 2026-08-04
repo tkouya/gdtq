@@ -15,7 +15,7 @@ AM_CPPFLAGS = \
 
 AM_CXXFLAGS = -O3 $(OPENMP_CXXFLAGS)
 
-noinst_PROGRAMS = benchmark sqstest
+noinst_PROGRAMS = benchmark sqstest fmatest fmabench
 
 ## ======== benchmark (double layers) =================================
 benchmark_SOURCES = \
@@ -49,6 +49,26 @@ nodist_EXTRA_sqstest_SOURCES = dummy.cxx
 sqstest_LDADD   = sqstest_kernel.$(OBJEXT) @CUDA_LIBS@
 sqstest_LDFLAGS = @CUDA_SDK_LDFLAGS@ @CUDA_LDFLAGS@
 sqstest_DEPENDENCIES = sqstest_kernel.$(OBJEXT)
+
+## ======== fmatest / fmabench (branch-free FMA, standalone) ==========
+## Both .cu files contain their own main(), like sqstest above, and
+## exercise the double- and the float-based layers together.
+##
+##   fmatest   accuracy of dw_fma / tw_fma / qw_fma and of the division
+##             and square root built on them, checked on the GPU against
+##             an exact expansion-arithmetic reference on the host.
+##   fmabench  old (0.0.2) vs new (0.0.3) timings for the same.
+fmatest_SOURCES =
+nodist_EXTRA_fmatest_SOURCES = dummy.cxx
+fmatest_LDADD   = fmatest_kernel.$(OBJEXT) @CUDA_LIBS@
+fmatest_LDFLAGS = @CUDA_SDK_LDFLAGS@ @CUDA_LDFLAGS@
+fmatest_DEPENDENCIES = fmatest_kernel.$(OBJEXT)
+
+fmabench_SOURCES =
+nodist_EXTRA_fmabench_SOURCES = dummy.cxx
+fmabench_LDADD   = fmabench_kernel.$(OBJEXT) @CUDA_LIBS@
+fmabench_LDFLAGS = @CUDA_SDK_LDFLAGS@ @CUDA_LDFLAGS@
+fmabench_DEPENDENCIES = fmabench_kernel.$(OBJEXT)
 
 ## ======== nvcc rules ================================================
 
@@ -130,11 +150,33 @@ sqstest_kernel.$(OBJEXT): sqstest_kernel.cu $(KERNEL_S_DEPS)
 	    $(NVCC_DEFS) $(NVCC_INCLUDES) \
 	    -c $(srcdir)/sqstest_kernel.cu -o $@
 
-CLEANFILES = gqdtest_kernel.$(OBJEXT) sqstest_kernel.$(OBJEXT)
+fmatest_kernel.$(OBJEXT): fmatest_kernel.cu $(KERNEL_DEPS)
+	@NVCC@ @NVCC_FLAGS@ -arch=@CUDA_ARCH@ \
+	    $(NVCC_DEFS) $(NVCC_INCLUDES) \
+	    -c $(srcdir)/fmatest_kernel.cu -o $@
+
+fmabench_kernel.$(OBJEXT): fmabench_kernel.cu $(KERNEL_DEPS)
+	@NVCC@ @NVCC_FLAGS@ -arch=@CUDA_ARCH@ \
+	    $(NVCC_DEFS) $(NVCC_INCLUDES) \
+	    -c $(srcdir)/fmabench_kernel.cu -o $@
+
+## Convenience targets: run the FMA accuracy test / benchmark.
+fmacheck: fmatest$(EXEEXT)
+	./fmatest$(EXEEXT)
+
+bench: fmabench$(EXEEXT)
+	./fmabench$(EXEEXT)
+
+.PHONY: fmacheck bench
+
+CLEANFILES = gqdtest_kernel.$(OBJEXT) sqstest_kernel.$(OBJEXT) \
+	fmatest_kernel.$(OBJEXT) fmabench_kernel.$(OBJEXT)
 
 EXTRA_DIST = \
 	gqdtest_kernel.cu \
 	sqstest_kernel.cu \
+	fmatest_kernel.cu \
+	fmabench_kernel.cu \
 	clean.sh \
 	make.sh \
 	README_CUDA13_FIX.md

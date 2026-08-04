@@ -5,7 +5,7 @@ A short reference for using `gdtq`, a header-only collection that provides
 **double-single / triple-single / quadruple-single** (DS/TS/QS) multi-precision
 arithmetic on CUDA, from your own project.
 
-Target version: **gdtq-0.0.2** (derived from QD 2.3 / GQD, with `gtd_real` added)
+Target version: **gdtq-0.0.3** (derived from QD 2.3 / GQD, with `gtd_real` added)
 
 ---
 
@@ -198,12 +198,42 @@ void run_dd_add(const gdd_real* a, const gdd_real* b, gdd_real* c, unsigned n) {
 - Arithmetic: `+ - * /` (`gdd_real op gdd_real`, `gdd_real op double`, `double op gdd_real`)
 - Unary: `negative(a)` / `-a`, `fabs(a)`
 - Powers: `sqr(a)`, `sqrt(a)`, `mul_pwr2(a, p2)`, `ldexp(a, n)`
+- Fused multiply-add: `fma(a, b, c)` = `a*b + c`, also spelled `dw_fma`
+  (gdd/gds), `tw_fma` (gtd/gts), `qw_fma` (gqd/gqs)
 - Comparison: `== != < <= > >=` (some host-and-device, some device-only)
 - Predicates: `is_zero / is_one / is_positive / is_negative`
 - Conversion: `to_double(a)`, `make_dd / make_td / make_qd / make_ds / make_ts / make_qs`
 - Functions: `exp / log / sin / cos / tan` for every precision
 - Defining `ALL_MATH` in `gqd_type.h` adds `asin/acos/atan/sinh/cosh/tanh/...`
   (**warning: compile time can stretch into hours**)
+
+### 6.1b Branch-free fused multiply-add (new in 0.0.3)
+
+`a * b + c` is available as a single fused, branch-free `__device__`
+operation for every precision class:
+
+```cuda
+gdd_real z = dw_fma(a, b, c);   // double-word  (gdd_real, gds_real)
+gtd_real z = tw_fma(a, b, c);   // triple-word  (gtd_real, gts_real)
+gqd_real z = qw_fma(a, b, c);   // quad-word    (gqd_real, gqs_real)
+
+gqd_real z = fma(a, b, c);      // generic spelling, works for all six
+gqd_real z = qw_fma(a, 2.5, c); // multiplier may be a bare double / float
+```
+
+The terms of the exact product and the words of the addend are
+accumulated in one straight-line network, so the product is never
+renormalized on its own: fewer operations than `a * b + c`, and never
+less accurate.
+
+Division and square root are built on these routines.  `operator/` calls
+`fma_div`; compile with `-DGQD_NO_FMA_DIV` to fall back to the 0.0.2
+`sloppy_div` / `standard_div`.  `sqrt` uses fused Newton steps run at
+increasing precision; the 0.0.2 implementation remains available as
+`sqrt_legacy(a)`.
+
+Run `make bench` in `test/` for old-vs-new timings on your GPU, and
+`make fmacheck` for the accuracy test.
 
 ### 6.2 Predefined constants
 
@@ -325,6 +355,9 @@ plain C linker fails to resolve `libstdc++` symbols such as
 - `test/gqdtest_kernel.cu` — canonical kernel translation unit
 - `test/test_util.cpp` / `test_util.h` — `qd_real ↔ g*_real` conversion helpers
 - `test/sqstest_kernel.cu` — small standalone float-layer test with its own `main()`
+- `test/fmatest_kernel.cu` — accuracy test for `dw_fma`/`tw_fma`/`qw_fma` and for
+  the division and square root built on them
+- `test/fmabench_kernel.cu` — old-vs-new timings for the same
 - `test/README_CUDA13_FIX.md` — notes on the CUDA 13 migration
 - `inc/gqd_type.h` — type aliases and `GxxStart/End` declarations
 - `inc/common.cuh` / `inc/common_s.cuh` — constants and table declarations

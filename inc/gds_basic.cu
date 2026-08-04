@@ -190,10 +190,64 @@ gds_real operator*(float a, const gds_real &b)
 }
 
 
+/**************** Fused multiply-add ****************/
+
+// 2026-08-04 T.Kouya
+// Branch free algorithm: double-word FMA,  z = a * b + c  (float limbs).
+// Same network as the gdd_real version; see gdd_basic.cu.
+__device__
+gds_real dw_fma(const gds_real &a, const gds_real &b, const gds_real &c)
+{
+	float a0, b0, c0, d0;
+	float a1, b1;
+	float a2, b2;
+
+	a0 = two_prod(a.x, b.x, b0);                        /* level 0 / 1 */
+	c0 = __fmul_rn(a.x, b.y) + __fmul_rn(a.y, b.x);     /* level 1 */
+	a1 = two_sum(a0, c.x, b1);                          /* level 0 */
+	/* b1 is added last: it is the only term that depends on c.x, so
+	   the rest stays off the critical path of a chained fma. */
+	d0 = ((b0 + c0) + c.y) + b1;                        /* level 1 */
+	a2 = quick_two_sum(a1, d0, b2);
+
+	return make_ds(a2, b2);
+}
+
+/* double-word FMA with a plain float multiplier:  a * b + c. */
+__device__
+gds_real dw_fma(const gds_real &a, float b, const gds_real &c)
+{
+	float a0, b0, d0;
+	float a1, b1;
+	float a2, b2;
+
+	a0 = two_prod(a.x, b, b0);
+	b0 = __fadd_rn(b0, __fmul_rn(a.y, b));
+	a1 = two_sum(a0, c.x, b1);
+	d0 = (b0 + c.y) + b1;
+	a2 = quick_two_sum(a1, d0, b2);
+
+	return make_ds(a2, b2);
+}
+
+/* Generic spelling; same operation. */
+__device__
+gds_real fma(const gds_real &a, const gds_real &b, const gds_real &c)
+{
+	return dw_fma(a, b, c);
+}
+
+__device__
+gds_real fma(const gds_real &a, float b, const gds_real &c)
+{
+	return dw_fma(a, b, c);
+}
+
+
 /******************* Division *********************/
 
 __device__
-gds_real sloppy_div(const gds_real &a, const gds_real &b) 
+gds_real sloppy_div(const gds_real &a, const gds_real &b)
 {
 	float s1, s2;
 	float q1, q2;
@@ -215,11 +269,36 @@ gds_real sloppy_div(const gds_real &a, const gds_real &b)
 	return r;
 }
 
+/* Division built on the same error-free product the branch-free FMA
+   rests on; see the gdd_real version in gdd_basic.cu for the rationale.
+   The residual a - q1*b is formed in one fused pass and is never
+   renormalized into a double-word, because only its value is needed to
+   produce the next quotient digit. */
+__device__
+gds_real fma_div(const gds_real &a, const gds_real &b)
+{
+	float q1 = a.x / b.x;       /* approximate quotient */
+
+	float e;
+	float p = two_prod(q1, b.x, e);
+	float r = (((a.x - p) - e) + a.y) - __fmul_rn(q1, b.y);
+
+	float q2 = r / b.x;
+
+	float lo;
+	float hi = quick_two_sum(q1, q2, lo);
+	return make_ds(hi, lo);
+}
+
 /* float-float / float-float */
 __device__
-gds_real operator/(const gds_real &a, const gds_real &b) 
+gds_real operator/(const gds_real &a, const gds_real &b)
 {
+#ifdef GQD_NO_FMA_DIV
 	return sloppy_div(a, b);
+#else
+	return fma_div(a, b);
+#endif
 }
 
 

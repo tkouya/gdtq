@@ -304,6 +304,100 @@ gtd_real sqr(const gtd_real &a)
 }
 
 /*=================================================================
+ * fused multiply-add
+ *=================================================================*/
+
+// 2026-08-04 T.Kouya
+// Branch free algorithm: triple-word FMA,  z = a * b + c.
+//
+// Every term of the exact product a*b and every word of c is assigned to
+// the magnitude level it belongs to (level 0 ~ 1, level 1 ~ eps,
+// level 2 ~ eps^2).  The levels are accumulated with two_sum, the errors
+// spilling one level down, and the three level accumulators are
+// renormalized by the same quick_two_sum network used by bf_mul above.
+// No branch anywhere, and a*b is never renormalized on its own.
+__device__
+gtd_real tw_fma(const gtd_real &a, const gtd_real &b, const gtd_real &c)
+{
+  double a0, b0, c0, d0, e0, f0, g0;
+  double a1, b1, c1, d1, e1, f1;
+  double a2, b2, c2;
+  double a3, b3;
+  double a4, b4;
+  double a5, b5;
+  double a6, b6;
+
+  /* --- products --- */
+  a0 = two_prod(a.x, b.x, b0);        /* level 0 / level 1 */
+  c0 = two_prod(a.x, b.y, e0);        /* level 1 / level 2 */
+  d0 = two_prod(a.y, b.x, f0);        /* level 1 / level 2 */
+  g0 = a.x * b.z + a.y * b.y + a.z * b.x;   /* level 2 */
+
+  /* --- level 0 : leading product word + c.x --- */
+  a1 = two_sum(a0, c.x, b1);          /* b1 spills to level 1 */
+
+  /* --- level 1 : b0, c0, d0, c.y, b1 --- */
+  c1 = two_sum(c0, d0, d1);
+  e1 = two_sum(b0, c.y, f1);
+  a2 = two_sum(c1, e1, b2);
+  a3 = two_sum(a2, b1, b3);           /* level-1 accumulator a3 */
+
+  /* --- level 2 : all spills and the eps^2 product terms --- */
+  c2 = ((e0 + f0) + (g0 + c.z)) + ((d1 + f1) + (b2 + b3));
+
+  /* --- branch-free renormalization (as in bf_mul) --- */
+  a4 = quick_two_sum(a3, c2, b4);     /* level 1 + level 2 */
+  a5 = quick_two_sum(a1, a4, b5);     /* level 0 + level 1 */
+  a6 = quick_two_sum(b5, b4, b6);
+
+  return make_td(a5, a6, b6);
+}
+
+/* triple-word FMA with a plain double multiplier:  a * b + c. */
+__device__
+gtd_real tw_fma(const gtd_real &a, double b, const gtd_real &c)
+{
+  double a0, b0, c0, d0, e0;
+  double a1, b1, c1, d1;
+  double a2, b2;
+  double a3, b3, c3;
+  double a4, b4;
+  double a5, b5;
+  double a6, b6;
+
+  a0 = two_prod(a.x, b, b0);          /* level 0 / level 1 */
+  c0 = two_prod(a.y, b, d0);          /* level 1 / level 2 */
+  e0 = a.z * b;                       /* level 2 */
+
+  a1 = two_sum(a0, c.x, b1);          /* level 0, spill b1 */
+
+  c1 = two_sum(b0, c0, d1);
+  a2 = two_sum(c.y, b1, b2);
+  a3 = two_sum(c1, a2, b3);           /* level-1 accumulator a3 */
+
+  c3 = ((d0 + e0) + c.z) + ((d1 + b2) + b3);
+
+  a4 = quick_two_sum(a3, c3, b4);
+  a5 = quick_two_sum(a1, a4, b5);
+  a6 = quick_two_sum(b5, b4, b6);
+
+  return make_td(a5, a6, b6);
+}
+
+/* Generic spelling; same operation. */
+__device__
+gtd_real fma(const gtd_real &a, const gtd_real &b, const gtd_real &c)
+{
+	return tw_fma(a, b, c);
+}
+
+__device__
+gtd_real fma(const gtd_real &a, double b, const gtd_real &c)
+{
+	return tw_fma(a, b, c);
+}
+
+/*=================================================================
  * divisions
  *=================================================================*/
 
@@ -316,7 +410,7 @@ gtd_real sqr(const gtd_real &a)
  *   q  = renormalize3(q0, q1, q2, r.x/b.x)
  */
 __device__
-gtd_real operator/(const gtd_real &a, const gtd_real &b)
+gtd_real standard_div(const gtd_real &a, const gtd_real &b)
 {
 	double q0, q1, q2, q3;
 	gtd_real r;
@@ -333,6 +427,39 @@ gtd_real operator/(const gtd_real &a, const gtd_real &b)
 	q3 = r.x / b.x;
 
 	return make_td_renorm(q0, q1, q2, q3);
+}
+
+/* Same correction sequence, but every residual  r <- r - q*b  is one
+   fused tw_fma instead of a multiply followed by a subtraction, which
+   removes one renormalization per step. */
+__device__
+gtd_real fma_div(const gtd_real &a, const gtd_real &b)
+{
+	double q0, q1, q2, q3;
+	gtd_real r;
+
+	q0 = a.x / b.x;
+	r  = tw_fma(b, -q0, a);       /* r = a - q0 * b */
+
+	q1 = r.x / b.x;
+	r  = tw_fma(b, -q1, r);
+
+	q2 = r.x / b.x;
+	r  = tw_fma(b, -q2, r);
+
+	q3 = r.x / b.x;
+
+	return make_td_renorm(q0, q1, q2, q3);
+}
+
+__device__
+gtd_real operator/(const gtd_real &a, const gtd_real &b)
+{
+#ifdef GQD_NO_FMA_DIV
+	return standard_div(a, b);
+#else
+	return fma_div(a, b);
+#endif
 }
 
 __device__

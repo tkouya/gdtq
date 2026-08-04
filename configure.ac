@@ -2,7 +2,7 @@ dnl SPDX-License-Identifier: BSD-3-Clause
 dnl Copyright (c) 2026 Tomonori Kouya. Based on GQD (Mian Lu) and QD (Bailey et al., LBNL).
 
 AC_PREREQ([2.69])
-AC_INIT([gdtq], [0.0.2], [tkouya@gmail.com])
+AC_INIT([gdtq], [0.0.3], [tkouya@gmail.com])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_SRCDIR([inc/gqd_type.h])

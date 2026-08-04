@@ -4,7 +4,7 @@ CUDA 上で **double-double / triple-double / quadruple-double** （DD/TD/QD）�
 **double-single / triple-single / quadruple-single**（DS/TS/QS）の多倍長精度演算を
 提供するヘッダ群 `gdtq` を、自分のプロジェクトから利用するときの簡易リファレンスです。
 
-対象バージョン: **gdtq-0.0.2**（QD 2.3 / GQD 由来、`gtd_real` を追加）
+対象バージョン: **gdtq-0.0.3**（QD 2.3 / GQD 由来、`gtd_real` を追加）
 
 ---
 
@@ -194,12 +194,41 @@ void run_dd_add(const gdd_real* a, const gdd_real* b, gdd_real* c, unsigned n) {
 - 算術: `+ - * /`（`gdd_real op gdd_real`、`gdd_real op double`、`double op gdd_real`）
 - 単項: `negative(a)` / `-a`、`fabs(a)`
 - 平方: `sqr(a)`、`sqrt(a)`、`mul_pwr2(a, p2)`、`ldexp(a, n)`
+- 積和（FMA）: `fma(a, b, c)`（= `a*b + c`）。型別の名前は `dw_fma`（gdd/gds）、
+  `tw_fma`（gtd/gts）、`qw_fma`（gqd/gqs）
 - 比較: `== != < <= > >=`（一部 host/device 両対応）
 - 述語: `is_zero / is_one / is_positive / is_negative`
 - 変換: `to_double(a)`、`make_dd / make_td / make_qd / make_ds / make_ts / make_qs`
 - 関数: `exp / log / sin / cos / tan`（DD/TD/QD/DS/TS/QS すべて）
 - `ALL_MATH` を `gqd_type.h` で有効にすると `asin/acos/atan/sinh/cosh/tanh/...` も入る
   （**コンパイル時間が数時間に達することがある** ので注意）
+
+### 6.1b 分岐なし積和演算（fused multiply-add, 0.0.3 で追加）
+
+`a * b + c` を 1 個の融合演算として計算する `__device__` 関数を全精度
+クラスに用意しています。
+
+```cuda
+gdd_real z = dw_fma(a, b, c);   // double-word （gdd_real, gds_real）
+gtd_real z = tw_fma(a, b, c);   // triple-word （gtd_real, gts_real）
+gqd_real z = qw_fma(a, b, c);   // quad-word   （gqd_real, gqs_real）
+
+gqd_real z = fma(a, b, c);      // 総称名。6 型すべてで使えます
+gqd_real z = qw_fma(a, 2.5, c); // 乗数は素の double / float でも可
+```
+
+積 `a*b` の各項と加数 `c` の各語を 1 本の直線的（分岐なし）な加算
+ネットワークにまとめて累算するため、`a*b` を単独で正規化しません。
+`a * b + c` と書くより演算数が少なく、精度が落ちることもありません。
+
+除算と平方根はこのルーチンの上に構築されています。`operator/` は
+`fma_div` を呼びます（`-DGQD_NO_FMA_DIV` を付けると 0.0.2 の
+`sloppy_div` / `standard_div` に戻ります）。`sqrt` は融合積和による
+Newton 反復を精度を上げながら実行します。0.0.2 の実装は
+`sqrt_legacy(a)` として残してあります。
+
+手元の GPU での新旧比較は `test/` で `make bench`、精度確認は
+`make fmacheck` を実行してください。
 
 ### 6.2 主な定数
 

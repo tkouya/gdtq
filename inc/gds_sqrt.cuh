@@ -8,6 +8,10 @@
 __device__
 gds_real sqrt(const gds_real &a);
 
+/* Reference (0.0.2) implementation, kept for benchmarking. */
+__device__
+gds_real sqrt_legacy(const gds_real &a);
+
 #endif /* __GDS_SQRT_CUH__ */
 
 

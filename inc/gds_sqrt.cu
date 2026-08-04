@@ -25,8 +25,31 @@ gds_real sqrt(const gds_real &a)
   	float x = 1.0 / sqrt(a.x);
   	float ax = a.x * x;
 
-  	return ds_add(ax, (a - sqr(ax)).x * (x * 0.5));
-  	//return a - sqr(ax);
+  	/* d = high word of (a - ax*ax).  two_sqr(ax) is exact and
+  	 * a.x - p is exact by Sterbenz, so no double-single subtraction
+  	 * is needed -- the same error-free product the branch-free FMA
+  	 * is built on. */
+  	float e;
+  	float p = two_sqr(ax, e);
+  	float d = ((a.x - p) - e) + a.y;
+
+  	return ds_add(ax, d * (x * 0.5f));
+}
+
+/* Reference (0.0.2) square root, kept for benchmarking. */
+__device__
+gds_real sqrt_legacy(const gds_real &a)
+{
+	if (is_zero(a))
+		return make_ds(0.0);
+
+	if (is_negative(a))
+		return make_ds(0.0);
+
+	float x = 1.0 / sqrt(a.x);
+	float ax = a.x * x;
+
+	return ds_add(ax, (a - sqr(ax)).x * (x * 0.5));
 }
 
 #endif /* __GDS_SQRT_CU__ */

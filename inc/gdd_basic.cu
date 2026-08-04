@@ -202,10 +202,75 @@ gdd_real operator*(double a, const gdd_real &b)
 }
 
 
+/**************** Fused multiply-add ****************/
+
+// 2026-08-04 T.Kouya
+// Branch free algorithm: double-word FMA,  z = a * b + c.
+//
+// The inputs are spread over two "levels" of magnitude (level 0 is the
+// leading word, level 1 the trailing word).  Every term of the exact
+// product a*b and of c is dropped into the level it belongs to, the two
+// levels are accumulated with two_sum, and one quick_two_sum
+// renormalizes the result.  No branch, and a*b is never renormalized on
+// its own, so this is cheaper than -- and no less accurate than -- a*b+c.
+__device__
+gdd_real dw_fma(const gdd_real &a, const gdd_real &b, const gdd_real &c)
+{
+	double a0, b0, c0, d0;
+	double a1, b1;
+	double a2, b2;
+
+	/* level 0 : a0,  level 1 : b0 */
+	a0 = two_prod(a.x, b.x, b0);
+	/* level 1 : first-order cross terms */
+	c0 = __dmul_rn(a.x, b.y) + __dmul_rn(a.y, b.x);
+	/* level 0 : fold in c */
+	a1 = two_sum(a0, c.x, b1);
+	/* level 1 : everything else.  b1 is added last on purpose: it is the
+	   only term that depends on c.x, so the rest of the sum stays off
+	   the critical path of a chained multiply-and-add. */
+	d0 = ((b0 + c0) + c.y) + b1;
+	/* renormalize */
+	a2 = quick_two_sum(a1, d0, b2);
+
+	return make_dd(a2, b2);
+}
+
+/* double-word FMA with a plain double multiplier:  a * b + c. */
+__device__
+gdd_real dw_fma(const gdd_real &a, double b, const gdd_real &c)
+{
+	double a0, b0, d0;
+	double a1, b1;
+	double a2, b2;
+
+	a0 = two_prod(a.x, b, b0);
+	b0 = __dadd_rn(b0, __dmul_rn(a.y, b));
+	a1 = two_sum(a0, c.x, b1);
+	d0 = (b0 + c.y) + b1;
+	a2 = quick_two_sum(a1, d0, b2);
+
+	return make_dd(a2, b2);
+}
+
+/* Generic spelling; same operation. */
+__device__
+gdd_real fma(const gdd_real &a, const gdd_real &b, const gdd_real &c)
+{
+	return dw_fma(a, b, c);
+}
+
+__device__
+gdd_real fma(const gdd_real &a, double b, const gdd_real &c)
+{
+	return dw_fma(a, b, c);
+}
+
+
 /******************* Division *********************/
 
 __device__
-gdd_real sloppy_div(const gdd_real &a, const gdd_real &b) 
+gdd_real sloppy_div(const gdd_real &a, const gdd_real &b)
 {
 	double s1, s2;
 	double q1, q2;
@@ -227,11 +292,39 @@ gdd_real sloppy_div(const gdd_real &a, const gdd_real &b)
 	return r;
 }
 
+/* Division built on the same error-free product the branch-free FMA
+   rests on.  Same correction sequence as sloppy_div, but the residual
+   a - q1 * b  is formed in one fused pass: two_prod is a single hardware
+   FMA, and a.x - p is exact by Sterbenz (p = fl(q1*b.x) agrees with a.x
+   to within a couple of ulps).  Only the *value* of the residual is
+   needed to get the next quotient digit, so neither the product nor the
+   difference is renormalized into a double-word -- which is what
+   sloppy_div spends most of its time on. */
+__device__
+gdd_real fma_div(const gdd_real &a, const gdd_real &b)
+{
+	double q1 = a.x / b.x;      /* approximate quotient */
+
+	double e;
+	double p = two_prod(q1, b.x, e);
+	double r = (((a.x - p) - e) + a.y) - __dmul_rn(q1, b.y);
+
+	double q2 = r / b.x;
+
+	double lo;
+	double hi = quick_two_sum(q1, q2, lo);
+	return make_dd(hi, lo);
+}
+
 /* double-double / double-double */
 __device__
-gdd_real operator/(const gdd_real &a, const gdd_real &b) 
+gdd_real operator/(const gdd_real &a, const gdd_real &b)
 {
+#ifdef GQD_NO_FMA_DIV
 	return sloppy_div(a, b);
+#else
+	return fma_div(a, b);
+#endif
 }
 
 

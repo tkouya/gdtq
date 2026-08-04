@@ -5,4 +5,8 @@
 __device__
 gtd_real sqrt(const gtd_real &a);
 
+/* Reference (0.0.2) implementation, kept for benchmarking. */
+__device__
+gtd_real sqrt_legacy(const gtd_real &a);
+
 #endif /* __GTD_SQRT_CUH__ */

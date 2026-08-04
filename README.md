@@ -1,5 +1,5 @@
 ================================================
-GDTQ Version 0.0.2
+GDTQ Version 0.0.3
 Copyright (C) 2026 Tomonori Kouya
 based on the GQD library (Mian Lu) and QD library (Yozo Hida, Xiaoye S. Li,
 David H. Bailey; LBNL)
@@ -238,6 +238,54 @@ build. See [docs/GDTQ_QUICKREF.en.md](docs/GDTQ_QUICKREF.en.md) for the
 full list of operators, math functions, and constants.
 
 
+
+-----------------------------------------------------------------------
+Fused multiply-add (new in 0.0.3)
+-----------------------------------------------------------------------
+Every precision class provides a branch-free multi-word fused
+multiply-add that computes  a * b + c  as a single device operation:
+
+    gdd_real / gds_real   dw_fma(a, b, c)     (double-word)
+    gtd_real / gts_real   tw_fma(a, b, c)     (triple-word)
+    gqd_real / gqs_real   qw_fma(a, b, c)     (quad-word)
+
+`fma(a, b, c)` is accepted as a generic spelling for all six types, and
+an overload taking the multiplier as a plain double / float is provided
+as well.  All of them are `__device__` functions.
+
+The terms of the exact product a*b and the words of c are dropped into a
+single straight-line accumulation network -- no branch, and no
+renormalization of a*b on its own -- following the branch-free algorithms
+already used by bf_add / bf_mul in the gtd and gqd layers.
+
+Division and square root are built on these routines:
+
+  * `operator/` now calls `fma_div`, which runs the same correction
+    sequence as the 0.0.2 long division but forms each residual
+    r <- r - q*b with one fused operation.  The 0.0.2 routines
+    (`sloppy_div` for gdd/gqd/gds/gqs, `standard_div` for gtd/gts) are
+    still available, and -DGQD_NO_FMA_DIV restores them as the default.
+  * `sqrt` refines 1/sqrt(a) with Newton steps written as pairs of fused
+    multiply-adds, and runs each step at the cheapest precision that can
+    hold its result (double -> gdd -> gtd -> gqd, and the float
+    equivalent).  `sqrt_legacy` keeps the 0.0.2 implementation for
+    comparison.
+
+`make bench` in test/ (or ./fmabench) reports old-vs-new timings.  On an
+NVIDIA GB10 (sm_121) with CUDA 13.0 the fused paths are:
+
+    a*b + c    gdd x1.20  gtd x1.72  gqd x1.66
+               gds x1.16  gts x1.67  gqs x1.69
+    a / b      gdd x1.43  gtd x2.08  gqd x2.58
+               gds x1.35  gts x1.89  gqs x2.93
+    sqrt(a)    gdd x1.61  gtd x1.80  gqd x2.32
+               gds x7.43  gts x1.88  gqs x2.38
+
+Accuracy is unchanged: test/fmatest_kernel.cu checks every routine on the
+GPU against an exact expansion-arithmetic reference computed on the host,
+and all of them stay within a few units in the last place.
+
+
 -----------------------------------------------------------------------
 Using the library from C
 -----------------------------------------------------------------------
@@ -271,12 +319,18 @@ Programs in test/
                   result against the corresponding CPU reference
   * sqstest     - small standalone test for the float-based gds/gts/gqs
                   layers, with its own main()
+  * fmatest     - accuracy of dw_fma / tw_fma / qw_fma and of the
+                  division and square root built on them, checked
+                  against an exact expansion-arithmetic reference
+  * fmabench    - old (0.0.2) vs new (0.0.3) timings for the same
 
 Run after `make`:
 
     cd test
     ./benchmark
     ./sqstest
+    make fmacheck      # or ./fmatest
+    make bench         # or ./fmabench
 
 
 -----------------------------------------------------------------------

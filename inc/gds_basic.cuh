@@ -86,10 +86,31 @@ __device__
 gds_real operator*(float a, const gds_real &b);
 
 
+/**************** Fused multiply-add ****************/
+/* Branch-free double-word FMA (T. Kouya):  a * b + c  as one fused
+   operation, without renormalizing a * b on its own. */
+__device__
+gds_real dw_fma(const gds_real &a, const gds_real &b, const gds_real &c);
+
+__device__
+gds_real dw_fma(const gds_real &a, float b, const gds_real &c);
+
+/* Generic spelling; same operation. */
+__device__
+gds_real fma(const gds_real &a, const gds_real &b, const gds_real &c);
+
+__device__
+gds_real fma(const gds_real &a, float b, const gds_real &c);
+
+
 /******************* Division *********************/
 
 __device__
 gds_real sloppy_div(const gds_real &a, const gds_real &b);
+
+/* Division built on the branch-free double-word FMA. */
+__device__
+gds_real fma_div(const gds_real &a, const gds_real &b);
 
 /* float-float / float-float */
 __device__

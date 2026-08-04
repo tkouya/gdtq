@@ -513,9 +513,130 @@ gqd_real sqr(const gqd_real &a)
 	return make_qd(p0, p1, p2, p3);
 }
 
+/** fused multiply-add */
+
+// 2026-08-04 T.Kouya
+// Branch free algorithm: quad-word FMA,  z = a * b + c.
+//
+// Every term of the exact product a*b and every word of c is assigned to
+// the magnitude level it belongs to (level 0 ~ 1, level 1 ~ eps,
+// level 2 ~ eps^2, level 3 ~ eps^3).  Each level is accumulated with
+// two_sum, the errors spilling one level down, and the four level
+// accumulators are renormalized by the same quick_two_sum network used
+// by bf_add above.  No branch anywhere, and a*b is never renormalized on
+// its own.
+__device__
+gqd_real qw_fma(const gqd_real &a, const gqd_real &b, const gqd_real &c)
+{
+	double a0, b0, c0, d0, e0, f0, g0, h0, i0, j0, k0, l0, m0;
+	double a1, b1, c1, d1, e1, f1, g1;
+	double a2, b2, c2, d2, e2, f2, g2, h2, i2, j2, k2;
+	double a3, b3, c3, d3, e3;
+	double a4, b4, c4, d4;
+	double a5, b5, c5, d5;
+	double a6, b6, c6, d6;
+	double a7, b7;
+
+	/* --- products --- */
+	a0 = two_prod(a.x, b.x, b0);       /* level 0 / level 1 */
+	c0 = two_prod(a.x, b.y, g0);       /* level 1 / level 2 */
+	d0 = two_prod(a.y, b.x, h0);       /* level 1 / level 2 */
+	e0 = two_prod(a.x, b.z, i0);       /* level 2 / level 3 */
+	f0 = two_prod(a.y, b.y, j0);       /* level 2 / level 3 */
+	k0 = two_prod(a.z, b.x, l0);       /* level 2 / level 3 */
+	m0 = (a.x * b.w + a.w * b.x)       /* level 3 */
+	   + (a.y * b.z + a.z * b.y);
+
+	/* --- level 0 --- */
+	a1 = two_sum(a0, c.x, b1);         /* b1 spills to level 1 */
+
+	/* --- level 1 : b0, c0, d0, c.y, b1 --- */
+	c1 = two_sum(c0, d0, d1);
+	e1 = two_sum(b0, c.y, f1);
+	a2 = two_sum(c1, e1, b2);
+	g1 = two_sum(a2, b1, c2);          /* level-1 accumulator g1 */
+
+	/* --- level 2 : g0, h0, e0, f0, k0, c.z and the level-1 spills --- */
+	d2 = two_sum(g0, h0, e2);
+	f2 = two_sum(e0, f0, g2);
+	h2 = two_sum(k0, c.z, i2);
+	j2 = two_sum(d1, f1, k2);
+	a3 = two_sum(b2, c2, b3);
+	c3 = two_sum(d2, f2, d3);
+	e3 = two_sum(h2, j2, a4);
+	b4 = two_sum(c3, e3, c4);
+	a5 = two_sum(b4, a3, d4);          /* level-2 accumulator a5 */
+
+	/* --- level 3 : everything left --- */
+	b5 = (((i0 + j0) + (l0 + m0)) + c.w)
+	   + (((e2 + g2) + (i2 + k2)) + ((b3 + d3) + (a4 + c4) + d4));
+
+	/* --- branch-free renormalization (as in bf_add) --- */
+	c5 = quick_two_sum(a1, g1, d5);    /* level 0 + level 1 */
+	a6 = quick_two_sum(a5, b5, b6);    /* level 2 + level 3 */
+	c6 = quick_two_sum(d5, a6, d6);
+	a7 = quick_two_sum(d6, b6, b7);
+
+	return make_qd(c5, c6, a7, b7);
+}
+
+/* quad-word FMA with a plain double multiplier:  a * b + c. */
+__device__
+gqd_real qw_fma(const gqd_real &a, double b, const gqd_real &c)
+{
+	double a0, b0, c0, d0, e0, f0, g0;
+	double a1, b1, c1, d1, e1, f1, g1;
+	double a2, b2, c2, d2, e2, f2;
+	double a3, b3, c3;
+	double a4, b4, c4;
+	double a5, b5, c5, d5;
+	double a6, b6;
+	double a7, b7;
+
+	a0 = two_prod(a.x, b, b0);         /* level 0 / level 1 */
+	c0 = two_prod(a.y, b, d0);         /* level 1 / level 2 */
+	e0 = two_prod(a.z, b, f0);         /* level 2 / level 3 */
+	g0 = a.w * b;                      /* level 3 */
+
+	a1 = two_sum(a0, c.x, b1);         /* level 0 */
+
+	c1 = two_sum(b0, c0, d1);          /* level 1 */
+	e1 = two_sum(c.y, b1, f1);
+	g1 = two_sum(c1, e1, a2);          /* level-1 accumulator g1 */
+
+	b2 = two_sum(d0, e0, c2);          /* level 2 */
+	d2 = two_sum(c.z, d1, e2);
+	f2 = two_sum(f1, a2, a3);
+	b3 = two_sum(b2, d2, c3);
+	a4 = two_sum(b3, f2, b4);          /* level-2 accumulator a4 */
+
+	c4 = ((f0 + g0) + c.w)             /* level 3 */
+	   + (((c2 + e2) + (a3 + c3)) + b4);
+
+	a5 = quick_two_sum(a1, g1, b5);
+	c5 = quick_two_sum(a4, c4, d5);
+	a6 = quick_two_sum(b5, c5, b6);
+	a7 = quick_two_sum(b6, d5, b7);
+
+	return make_qd(a5, a6, a7, b7);
+}
+
+/* Generic spelling; same operation. */
+__device__
+gqd_real fma(const gqd_real &a, const gqd_real &b, const gqd_real &c)
+{
+	return qw_fma(a, b, c);
+}
+
+__device__
+gqd_real fma(const gqd_real &a, double b, const gqd_real &c)
+{
+	return qw_fma(a, b, c);
+}
+
 /** divisions */
 __device__
-gqd_real sloppy_div(const gqd_real &a, const gqd_real &b) 
+gqd_real sloppy_div(const gqd_real &a, const gqd_real &b)
 {
 	double q0, q1, q2, q3;
 
@@ -537,10 +658,40 @@ gqd_real sloppy_div(const gqd_real &a, const gqd_real &b)
 	return make_qd(q0, q1, q2, q3);
 }
 
+/* Same correction sequence as sloppy_div, but every residual
+   r <- r - q*b  is one fused qw_fma instead of a multiply followed by a
+   subtraction, which removes one renormalization per step. */
 __device__
-gqd_real operator/(const gqd_real &a, const gqd_real &b) 
+gqd_real fma_div(const gqd_real &a, const gqd_real &b)
 {
+	double q0, q1, q2, q3;
+
+	gqd_real r;
+
+	q0 = a.x / b.x;
+	r = qw_fma(b, -q0, a);        /* r = a - q0 * b */
+
+	q1 = r.x / b.x;
+	r = qw_fma(b, -q1, r);
+
+	q2 = r.x / b.x;
+	r = qw_fma(b, -q2, r);
+
+	q3 = r.x / b.x;
+
+	renorm(q0, q1, q2, q3);
+
+	return make_qd(q0, q1, q2, q3);
+}
+
+__device__
+gqd_real operator/(const gqd_real &a, const gqd_real &b)
+{
+#ifdef GQD_NO_FMA_DIV
 	return sloppy_div(a, b);
+#else
+	return fma_div(a, b);
+#endif
 }
 
 /* double / quad-double */

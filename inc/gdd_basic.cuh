@@ -109,6 +109,8 @@ gdd_real dw_fma(const gdd_real &a, const gdd_real &b, const gdd_real &c);
 
 __device__
 gdd_real dw_fma(const gdd_real &a, double b, const gdd_real &c);
+__device__
+gdd_real dw_fma_safe(const gdd_real &a, double b, const gdd_real &c);
 
 /* Generic spelling; same operation. */
 __device__

@@ -75,6 +75,8 @@ gtd_real tw_fma(const gtd_real &a, const gtd_real &b, const gtd_real &c);
 
 __device__
 gtd_real tw_fma(const gtd_real &a, double b, const gtd_real &c);
+__device__
+gtd_real tw_fma_safe(const gtd_real &a, double b, const gtd_real &c);
 
 /* Generic spelling; same operation. */
 __device__

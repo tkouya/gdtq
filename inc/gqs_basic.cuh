@@ -96,6 +96,8 @@ gqs_real qw_fma(const gqs_real &a, const gqs_real &b, const gqs_real &c);
 
 __device__
 gqs_real qw_fma(const gqs_real &a, float b, const gqs_real &c);
+__device__
+gqs_real qw_fma_safe(const gqs_real &a, float b, const gqs_real &c);
 
 /* Generic spelling; same operation. */
 __device__

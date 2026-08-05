@@ -195,39 +195,74 @@ gds_real operator*(float a, const gds_real &b)
 // 2026-08-04 T.Kouya
 // Branch free algorithm: double-word FMA,  z = a * b + c  (float limbs).
 // Same network as the gdd_real version; see gdd_basic.cu.
+/* DW-FMA  z = a * b + c   (17 flops)
+   Machine-proved with FPANVerifier + z3 5.0.0 (ACS2026 formulation):
+     error bound      |z-(ab+c)| <= 34 u^2 (|ab|+|c|)
+     every FastTwoSum precondition  exp(x) >= exp(y)
+     non-overlapping output         z0 |> z1   (strongly_dominates)
+   Normalization repeats a cascade over adjacent pairs; the pass count is the
+   smallest for which the non-overlap is provable (DW 1 / TW 3 / QW 5). */
 __device__
 gds_real dw_fma(const gds_real &a, const gds_real &b, const gds_real &c)
 {
-	float a0, b0, c0, d0;
-	float a1, b1;
-	float a2, b2;
-
-	a0 = two_prod(a.x, b.x, b0);                        /* level 0 / 1 */
-	c0 = __fmul_rn(a.x, b.y) + __fmul_rn(a.y, b.x);     /* level 1 */
-	a1 = two_sum(a0, c.x, b1);                          /* level 0 */
-	/* b1 is added last: it is the only term that depends on c.x, so
-	   the rest stays off the critical path of a chained fma. */
-	d0 = ((b0 + c0) + c.y) + b1;                        /* level 1 */
-	a2 = quick_two_sum(a1, d0, b2);
-
-	return make_ds(a2, b2);
+  float P00, E00, P01, P10, l, v, w, s, t, tp;
+  P00 = two_prod(a.x, b.x, E00);
+  P01 = a.x * b.y;
+  P10 = a.y * b.x;
+  l   = P01 + P10;
+  v   = E00 + c.y;
+  w   = v + l;
+  s   = two_sum(P00, c.x, t);
+  tp  = t + w;
+  float z0, z1;
+  z0 = quick_two_sum(s, tp, z1);
+  return make_ds(z0, z1);
 }
 
-/* double-word FMA with a plain float multiplier:  a * b + c. */
+/* DW-FMA  z = a * b + c   (17 flops, scalar multiplier)
+   Machine-proved with FPANVerifier + z3 5.0.0 (ACS2026 formulation):
+     error bound      |z-(ab+c)| <= 34 u^2 (|ab|+|c|)
+     every FastTwoSum precondition  exp(x) >= exp(y)
+     non-overlapping output         z0 |> z1   (strongly_dominates)
+   Normalization repeats a cascade over adjacent pairs; the pass count is the
+   smallest for which the non-overlap is provable (DW 1 / TW 3 / QW 5). */
+/* div/sqrt-safe variant (20 flops): the Newton iterations of division and
+   square root receive residuals that are not known to be non-overlapping, so
+   no FastTwoSum precondition can be claimed.  A FastTwoSum whose precondition
+   fails does not even satisfy s+e=a+b, so this variant uses TwoSum everywhere
+   with the same pass count as the standard one. */
+__device__
+gds_real dw_fma_safe(const gds_real &a, float b, const gds_real &c)
+{
+  float P00, E00, P01, P10, l, v, w, s, t, tp;
+  P00 = two_prod(a.x, b, E00);
+  P01 = 0.0;
+  P10 = a.y * b;
+  l   = P01 + P10;
+  v   = E00 + c.y;
+  w   = v + l;
+  s   = two_sum(P00, c.x, t);
+  tp  = t + w;
+  float z0, z1;
+  z0 = two_sum(s, tp, z1);
+  return make_ds(z0, z1);
+}
+
 __device__
 gds_real dw_fma(const gds_real &a, float b, const gds_real &c)
 {
-	float a0, b0, d0;
-	float a1, b1;
-	float a2, b2;
-
-	a0 = two_prod(a.x, b, b0);
-	b0 = __fadd_rn(b0, __fmul_rn(a.y, b));
-	a1 = two_sum(a0, c.x, b1);
-	d0 = (b0 + c.y) + b1;
-	a2 = quick_two_sum(a1, d0, b2);
-
-	return make_ds(a2, b2);
+  float P00, E00, P01, P10, l, v, w, s, t, tp;
+  P00 = two_prod(a.x, b, E00);
+  P01 = 0.0;
+  P10 = a.y * b;
+  l   = P01 + P10;
+  v   = E00 + c.y;
+  w   = v + l;
+  s   = two_sum(P00, c.x, t);
+  tp  = t + w;
+  float z0, z1;
+  z0 = quick_two_sum(s, tp, z1);
+  return make_ds(z0, z1);
 }
 
 /* Generic spelling; same operation. */

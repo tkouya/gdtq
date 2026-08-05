@@ -316,72 +316,122 @@ gtd_real sqr(const gtd_real &a)
 // spilling one level down, and the three level accumulators are
 // renormalized by the same quick_two_sum network used by bf_mul above.
 // No branch anywhere, and a*b is never renormalized on its own.
+/* TW-FMA  z = a * b + c   (72 flops)
+   Machine-proved with FPANVerifier + z3 5.0.0 (ACS2026 formulation):
+     error bound      |z-(ab+c)| <= 184 u^3 (|ab|+|c|)
+     every FastTwoSum precondition  exp(x) >= exp(y)
+     non-overlapping output         z0 |> z1 |> z2   (strongly_dominates)
+   Normalization repeats a cascade over adjacent pairs; the pass count is the
+   smallest for which the non-overlap is provable (DW 1 / TW 3 / QW 5). */
 __device__
 gtd_real tw_fma(const gtd_real &a, const gtd_real &b, const gtd_real &c)
 {
-  double a0, b0, c0, d0, e0, f0, g0;
-  double a1, b1, c1, d1, e1, f1;
-  double a2, b2, c2;
-  double a3, b3;
-  double a4, b4;
-  double a5, b5;
-  double a6, b6;
-
-  /* --- products --- */
-  a0 = two_prod(a.x, b.x, b0);        /* level 0 / level 1 */
-  c0 = two_prod(a.x, b.y, e0);        /* level 1 / level 2 */
-  d0 = two_prod(a.y, b.x, f0);        /* level 1 / level 2 */
-  g0 = a.x * b.z + a.y * b.y + a.z * b.x;   /* level 2 */
-
-  /* --- level 0 : leading product word + c.x --- */
-  a1 = two_sum(a0, c.x, b1);          /* b1 spills to level 1 */
-
-  /* --- level 1 : b0, c0, d0, c.y, b1 --- */
-  c1 = two_sum(c0, d0, d1);
-  e1 = two_sum(b0, c.y, f1);
-  a2 = two_sum(c1, e1, b2);
-  a3 = two_sum(a2, b1, b3);           /* level-1 accumulator a3 */
-
-  /* --- level 2 : all spills and the eps^2 product terms --- */
-  c2 = ((e0 + f0) + (g0 + c.z)) + ((d1 + f1) + (b2 + b3));
-
-  /* --- branch-free renormalization (as in bf_mul) --- */
-  a4 = quick_two_sum(a3, c2, b4);     /* level 1 + level 2 */
-  a5 = quick_two_sum(a1, a4, b5);     /* level 0 + level 1 */
-  a6 = quick_two_sum(b5, b4, b6);
-
-  return make_td(a5, a6, b6);
+  double P00, E00, P01, E01, P10, E10, P02, P11, P20, sg, G;
+  double A, q1, q2, q3, B, r, m1, m2, w0, w1, w2;
+  P00 = two_prod(a.x, b.x, E00);
+  P01 = two_prod(a.x, b.y, E01);
+  P10 = two_prod(a.y, b.x, E10);
+  P02 = a.x * b.z;
+  P11 = a.y * b.y;
+  P20 = a.z * b.x;
+  sg  = (P02 + P20) + P11;
+  G   = ((E01 + E10) + sg) + c.z;
+  A   = two_sum(P01, P10, q1);
+  A   = two_sum(A, E00, q2);
+  A   = two_sum(A, c.y, q3);
+  G   = G + ((q1 + q2) + q3);
+  B   = two_sum(P00, c.x, r);
+  m1  = two_sum(r, A, m2);
+  m2  = m2 + G;
+  double z0, z1, z2;
+  /* renormalization pass 1/3 */
+  w0 = quick_two_sum(B, m1, w1);
+  w1 = two_sum(w1, m2, w2);
+  /* renormalization pass 2/3 */
+  w0 = two_sum(w0, w1, w1);
+  w1 = quick_two_sum(w1, w2, w2);
+  /* renormalization pass 3/3 */
+  z0 = quick_two_sum(w0, w1, w1);
+  z1 = quick_two_sum(w1, w2, z2);
+  return make_td(z0, z1, z2);
 }
 
-/* triple-word FMA with a plain double multiplier:  a * b + c. */
+/* TW-FMA  z = a * b + c   (72 flops, scalar multiplier)
+   Machine-proved with FPANVerifier + z3 5.0.0 (ACS2026 formulation):
+     error bound      |z-(ab+c)| <= 184 u^3 (|ab|+|c|)
+     every FastTwoSum precondition  exp(x) >= exp(y)
+     non-overlapping output         z0 |> z1 |> z2   (strongly_dominates)
+   Normalization repeats a cascade over adjacent pairs; the pass count is the
+   smallest for which the non-overlap is provable (DW 1 / TW 3 / QW 5). */
+/* div/sqrt-safe variant (84 flops): the Newton iterations of division and
+   square root receive residuals that are not known to be non-overlapping, so
+   no FastTwoSum precondition can be claimed.  A FastTwoSum whose precondition
+   fails does not even satisfy s+e=a+b, so this variant uses TwoSum everywhere
+   with the same pass count as the standard one. */
+__device__
+gtd_real tw_fma_safe(const gtd_real &a, double b, const gtd_real &c)
+{
+  double P00, E00, P01, E01, P10, E10, P02, P11, P20, sg, G;
+  double A, q1, q2, q3, B, r, m1, m2, w0, w1, w2;
+  P00 = two_prod(a.x, b, E00);
+  P01 = 0.0; E01 = 0.0;
+  P10 = two_prod(a.y, b, E10);
+  P02 = 0.0;
+  P11 = 0.0;
+  P20 = a.z * b;
+  sg  = (P02 + P20) + P11;
+  G   = ((E01 + E10) + sg) + c.z;
+  A   = two_sum(P01, P10, q1);
+  A   = two_sum(A, E00, q2);
+  A   = two_sum(A, c.y, q3);
+  G   = G + ((q1 + q2) + q3);
+  B   = two_sum(P00, c.x, r);
+  m1  = two_sum(r, A, m2);
+  m2  = m2 + G;
+  double z0, z1, z2;
+  /* renormalization pass 1/3 */
+  w0 = two_sum(B, m1, w1);
+  w1 = two_sum(w1, m2, w2);
+  /* renormalization pass 2/3 */
+  w0 = two_sum(w0, w1, w1);
+  w1 = two_sum(w1, w2, w2);
+  /* renormalization pass 3/3 */
+  z0 = two_sum(w0, w1, w1);
+  z1 = two_sum(w1, w2, z2);
+  return make_td(z0, z1, z2);
+}
+
 __device__
 gtd_real tw_fma(const gtd_real &a, double b, const gtd_real &c)
 {
-  double a0, b0, c0, d0, e0;
-  double a1, b1, c1, d1;
-  double a2, b2;
-  double a3, b3, c3;
-  double a4, b4;
-  double a5, b5;
-  double a6, b6;
-
-  a0 = two_prod(a.x, b, b0);          /* level 0 / level 1 */
-  c0 = two_prod(a.y, b, d0);          /* level 1 / level 2 */
-  e0 = a.z * b;                       /* level 2 */
-
-  a1 = two_sum(a0, c.x, b1);          /* level 0, spill b1 */
-
-  c1 = two_sum(b0, c0, d1);
-  a2 = two_sum(c.y, b1, b2);
-  a3 = two_sum(c1, a2, b3);           /* level-1 accumulator a3 */
-
-  c3 = ((d0 + e0) + c.z) + ((d1 + b2) + b3);
-
-  a4 = quick_two_sum(a3, c3, b4);
-  a5 = quick_two_sum(a1, a4, b5);
-  a6 = quick_two_sum(b5, b4, b6);
-
-  return make_td(a5, a6, b6);
+  double P00, E00, P01, E01, P10, E10, P02, P11, P20, sg, G;
+  double A, q1, q2, q3, B, r, m1, m2, w0, w1, w2;
+  P00 = two_prod(a.x, b, E00);
+  P01 = 0.0; E01 = 0.0;
+  P10 = two_prod(a.y, b, E10);
+  P02 = 0.0;
+  P11 = 0.0;
+  P20 = a.z * b;
+  sg  = (P02 + P20) + P11;
+  G   = ((E01 + E10) + sg) + c.z;
+  A   = two_sum(P01, P10, q1);
+  A   = two_sum(A, E00, q2);
+  A   = two_sum(A, c.y, q3);
+  G   = G + ((q1 + q2) + q3);
+  B   = two_sum(P00, c.x, r);
+  m1  = two_sum(r, A, m2);
+  m2  = m2 + G;
+  double z0, z1, z2;
+  /* renormalization pass 1/3 */
+  w0 = quick_two_sum(B, m1, w1);
+  w1 = two_sum(w1, m2, w2);
+  /* renormalization pass 2/3 */
+  w0 = two_sum(w0, w1, w1);
+  w1 = quick_two_sum(w1, w2, w2);
+  /* renormalization pass 3/3 */
+  z0 = quick_two_sum(w0, w1, w1);
+  z1 = quick_two_sum(w1, w2, z2);
+  return make_td(z0, z1, z2);
 }
 
 /* Generic spelling; same operation. */
@@ -439,13 +489,13 @@ gtd_real fma_div(const gtd_real &a, const gtd_real &b)
 	gtd_real r;
 
 	q0 = a.x / b.x;
-	r  = tw_fma(b, -q0, a);       /* r = a - q0 * b */
+	r  = tw_fma_safe(b, -q0, a);       /* r = a - q0 * b */
 
 	q1 = r.x / b.x;
-	r  = tw_fma(b, -q1, r);
+	r  = tw_fma_safe(b, -q1, r);
 
 	q2 = r.x / b.x;
-	r  = tw_fma(b, -q2, r);
+	r  = tw_fma_safe(b, -q2, r);
 
 	q3 = r.x / b.x;
 

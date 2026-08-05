@@ -75,6 +75,8 @@ gts_real tw_fma(const gts_real &a, const gts_real &b, const gts_real &c);
 
 __device__
 gts_real tw_fma(const gts_real &a, float b, const gts_real &c);
+__device__
+gts_real tw_fma_safe(const gts_real &a, float b, const gts_real &c);
 
 /* Generic spelling; same operation. */
 __device__

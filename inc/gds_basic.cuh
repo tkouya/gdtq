@@ -94,6 +94,8 @@ gds_real dw_fma(const gds_real &a, const gds_real &b, const gds_real &c);
 
 __device__
 gds_real dw_fma(const gds_real &a, float b, const gds_real &c);
+__device__
+gds_real dw_fma_safe(const gds_real &a, float b, const gds_real &c);
 
 /* Generic spelling; same operation. */
 __device__

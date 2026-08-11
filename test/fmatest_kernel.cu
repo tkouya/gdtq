@@ -8,7 +8,10 @@
  *     tw_fma  (triple-word : gtd_real, gts_real)
  *     qw_fma  (quad-word   : gqd_real, gqs_real)
  *
- * and for the division and square root built on top of them.
+ * and for the division and square root built on top of them.  A
+ * separate section exercises the fused multiply-add under complete
+ * cancellation (c = -(a*b)), where the machine-proved formulation must
+ * keep its ordinary error bound |error| <= few * eps * (|a*b| + |c|).
  *
  * The reference value is not another floating-point type: every quantity
  * that appears in  a * b + c  is expanded on the host into an *exact*
@@ -54,6 +57,18 @@ template <class T>
 __global__ void k_muladd(const T *a, const T *b, const T *c, T *z, int n) {
 	int i = blockIdx.x * blockDim.x + threadIdx.x;
 	if (i < n) z[i] = a[i] * b[i] + c[i];
+}
+
+/* Complete cancellation: c = -(a*b), computed in the type itself, so the
+   leading words of the fused multiply-add cancel almost entirely. */
+template <class T>
+__global__ void k_cancel(const T *a, const T *b, T *c, T *z, int n) {
+	int i = blockIdx.x * blockDim.x + threadIdx.x;
+	if (i < n) {
+		T ci = negative(a[i] * b[i]);
+		c[i] = ci;
+		z[i] = fma(a[i], b[i], ci);
+	}
 }
 
 template <class T>
@@ -251,6 +266,27 @@ static void test_type(const char *name, double tol) {
 		if (u > worst) worst = u;
 	}
 	sprintf(buf, "%s  a*b+c (unfused)", name);
+	report(buf, worst, tol);
+
+	/* ---- complete cancellation:  c = -(a*b) ----
+	   The machine-proved formulation must keep its ordinary error bound
+	   |error| <= few * eps * (|a*b| + |c|)  in this case too -- this is
+	   what lets polyeval run on the plain fma next to a root.  (A
+	   FastTwoSum-gated renormalization without the proof loses about
+	   half of its words here.) */
+	k_cancel<T><<<grid, BLOCK>>>(da, db, dc, dz, n);
+	cudaDeviceSynchronize(); cutilCheckMsg("k_cancel");
+	FROMGPU(hc, dc, sz);
+	FROMGPU(hz, dz, sz);
+
+	worst = 0.0;
+	for (int i = 0; i < n; i++) {
+		double scale = lead(ha[i]) * lead(hb[i]) + lead(hc[i]);
+		if (scale == 0.0) continue;
+		double u = residual(ha[i], hb[i], hc[i], hz[i]) / (scale * eps);
+		if (u > worst) worst = u;
+	}
+	sprintf(buf, "%s  cancellation", name);
 	report(buf, worst, tol);
 
 	/* ---- division:  b*(a/b) must reproduce a ---- */

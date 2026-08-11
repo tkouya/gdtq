@@ -43,6 +43,7 @@ gqd_real make_qd( const double x );
 #define _dd_eps (4.93038065763132e-32)  // 2^-104
 #define _dd_e make_dd(2.718281828459045091e+00, 1.445646891729250158e-16)
 #define _dd_log2 make_dd(6.931471805599452862e-01, 2.319046813846299558e-17)
+#define _dd_log10 make_dd(2.302585092994045901e+00, -2.170756223382249351e-16)
 #define _dd_2pi make_dd(6.283185307179586232e+00, 2.449293598294706414e-16)
 #define _dd_pi make_dd(3.141592653589793116e+00, 1.224646799147353207e-16)
 #define _dd_pi2 make_dd(1.570796326794896558e+00, 6.123233995736766036e-17)
@@ -54,6 +55,7 @@ gqd_real make_qd( const double x );
 #define _td_eps  (8.673617379884035e-48)  /* ~ 2^-156, three-double rounding */
 #define _td_e    make_td(2.718281828459045091e+00, 1.445646891729250158e-16, -2.127717108038176765e-33)
 #define _td_log2 make_td(6.931471805599452862e-01, 2.319046813846299558e-17,  5.707708438416212066e-34)
+#define _td_log10 make_td(2.302585092994045901e+00, -2.170756223382249351e-16, -9.984262454465776570e-33)
 #define _td_2pi  make_td(6.283185307179586232e+00, 2.449293598294706414e-16, -5.989539619436679332e-33)
 #define _td_pi   make_td(3.141592653589793116e+00, 1.224646799147353207e-16, -2.994769809718339666e-33)
 #define _td_pi2  make_td(1.570796326794896558e+00, 6.123233995736766036e-17, -1.497384904859169833e-33)
@@ -62,6 +64,7 @@ gqd_real make_qd( const double x );
 
 #define _qd_e make_qd(2.718281828459045091e+00, 1.445646891729250158e-16,  -2.127717108038176765e-33, 1.515630159841218954e-49)
 #define _qd_log2 make_qd(6.931471805599452862e-01, 2.319046813846299558e-17,5.707708438416212066e-34,-3.582432210601811423e-50)
+#define _qd_log10 make_qd(2.302585092994045901e+00, -2.170756223382249351e-16, -9.984262454465776570e-33, -4.023357454450206379e-49)
 #define _qd_eps (1.21543267145725e-63) // = 2^-209
 #define _qd_2pi make_qd(6.283185307179586232e+00, 2.449293598294706414e-16, -5.989539619436679332e-33, 2.224908441726730563e-49)
 #define _qd_pi make_qd(3.141592653589793116e+00, 1.224646799147353207e-16, -2.994769809718339666e-33, 1.112454220863365282e-49)
@@ -104,10 +107,14 @@ extern __device__ __constant__ gdd_real d_dd_cos_table[4];
 extern __device__ __constant__ gtd_real td_inv_fact[n_td_inv_fact];
 extern __device__ __constant__ gtd_real d_td_sin_table[256];
 extern __device__ __constant__ gtd_real d_td_cos_table[256];
+extern __device__ __constant__ gtd_real d_td_exp_table_64[47];
+extern __device__ __constant__ gtd_real d_td_exp_table_8192[131];
 
 extern __device__ __constant__ gqd_real inv_fact[15];
 extern __device__ __constant__ gqd_real d_sin_table[256];
 extern __device__ __constant__ gqd_real d_cos_table[256];
+extern __device__ __constant__ gqd_real d_exp_table_64[47];
+extern __device__ __constant__ gqd_real d_exp_table_8192[131];
 #else
 /* (A) Single-TU: per-TU static storage (original gdtq pattern). */
 static __device__ __constant__ gdd_real dd_inv_fact[n_dd_inv_fact];
@@ -117,6 +124,8 @@ static __device__ __constant__ gdd_real d_dd_cos_table[4];
 static __device__ __constant__ gtd_real td_inv_fact[n_td_inv_fact];
 static __device__ __constant__ gtd_real d_td_sin_table[256];
 static __device__ __constant__ gtd_real d_td_cos_table[256];
+static __device__ __constant__ gtd_real d_td_exp_table_64[47];
+static __device__ __constant__ gtd_real d_td_exp_table_8192[131];
 
 static __device__ __constant__ gqd_real inv_fact[15];
 /*
@@ -128,6 +137,8 @@ static __device__ __constant__ gqd_real inv_fact[15];
  */
 static __device__ __constant__ gqd_real d_sin_table[256];
 static __device__ __constant__ gqd_real d_cos_table[256];
+static __device__ __constant__ gqd_real d_exp_table_64[47];
+static __device__ __constant__ gqd_real d_exp_table_8192[131];
 #endif
 
 static const int n_inv_fact = 15;

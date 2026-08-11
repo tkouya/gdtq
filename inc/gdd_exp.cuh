@@ -8,6 +8,10 @@
 __device__
 gdd_real exp(const gdd_real &a);
 
+/* exp(a) - 1, accurate for small |a|. */
+__device__
+gdd_real expm1(const gdd_real &a);
+
 #endif /* __GDD_EXP_CUH__ */
 
 

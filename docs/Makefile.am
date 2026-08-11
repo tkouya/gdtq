@@ -7,4 +7,5 @@
 
 dist_doc_DATA = \
 	GDTQ_QUICKREF.ja.md \
-	GDTQ_QUICKREF.en.md
+	GDTQ_QUICKREF.en.md \
+	GDTQ_FMA_REPORT.md

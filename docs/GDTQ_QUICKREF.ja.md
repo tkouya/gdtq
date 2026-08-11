@@ -37,6 +37,13 @@ inc/gqd_type.h… 型定義（gdd_real など）と GxxStart/End の宣言
 | `gts_real` | `float3`   | ~21桁 (3×24bit) | TS |
 | `gqs_real` | `float4`   | ~28桁 (4×24bit) | QS |
 
+**float 系型の有効レンジ**: 値 x のリムはおよそ |x|, |x|·2⁻²⁴, |x|·2⁻⁴⁸,
+|x|·2⁻⁷² に位置するため、最下位リムが float の正規化数範囲 (≥ 2⁻¹²⁶) に
+収まる間だけ全精度が保たれます: `gds_real` は |x| ≥ 2⁻¹⁰² (~2.0e-31)、
+`gts_real` は ≥ 2⁻⁷⁸ (~3.3e-24)、`gqs_real` は ≥ 2⁻⁵⁴ (~5.5e-17)。
+しきい値未満では(アルゴリズムによらず)半減ごとに約 1 ビットずつ精度が
+低下します。double 系型は実用上影響を受けません。
+
 CUDA 13 以降は `double4` 等が deprecated 警告を出します。
 `__NV_NO_VECTOR_DEPRECATION_DIAG` を **すべての include より前** に定義して抑止します
 （ヘッダ内で自動定義していますが、ホスト `.cpp` から `<cuda.h>` を直接読む場合は
@@ -199,7 +206,9 @@ void run_dd_add(const gdd_real* a, const gdd_real* b, gdd_real* c, unsigned n) {
 - 比較: `== != < <= > >=`（一部 host/device 両対応）
 - 述語: `is_zero / is_one / is_positive / is_negative`
 - 変換: `to_double(a)`、`make_dd / make_td / make_qd / make_ds / make_ts / make_qs`
-- 関数: `exp / log / sin / cos / tan`（DD/TD/QD/DS/TS/QS すべて）
+- 関数: `exp / expm1 / log / log10 / sin / cos / tan`（DD/TD/QD/DS/TS/QS すべて）
+- `polyeval(c, n, x)`: Horner 法による n 次多項式評価(全 6 クラス、
+  1 ステップ 1 融合積和)
 - `ALL_MATH` を `gqd_type.h` で有効にすると `asin/acos/atan/sinh/cosh/tanh/...` も入る
   （**コンパイル時間が数時間に達することがある** ので注意）
 

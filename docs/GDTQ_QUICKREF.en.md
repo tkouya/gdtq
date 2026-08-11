@@ -39,6 +39,14 @@ After `make install` the contents of `inc/` are copied to
 | `gts_real` | `float3`  | ~21 digits (3×24 bit) | TS |
 | `gqs_real` | `float4`  | ~28 digits (4×24 bit) | QS |
 
+**Effective range of the float-based types**: the limbs of a value x sit
+at about |x|, |x|·2⁻²⁴, |x|·2⁻⁴⁸, |x|·2⁻⁷², so full precision requires
+the lowest limb to stay in the float normal range (≥ 2⁻¹²⁶): |x| ≥ 2⁻¹⁰²
+(~2.0e-31) for `gds_real`, ≥ 2⁻⁷⁸ (~3.3e-24) for `gts_real`, ≥ 2⁻⁵⁴
+(~5.5e-17) for `gqs_real`.  Below the threshold precision degrades by
+about one bit per halving, regardless of the algorithm.  The
+double-based types are unaffected in practice.
+
 CUDA 13+ marks `double4` (and friends) as deprecated. Define
 `__NV_NO_VECTOR_DEPRECATION_DIAG` **before any include** to suppress the
 warning. The headers do this themselves, but if a host `.cpp` pulls
@@ -203,7 +211,9 @@ void run_dd_add(const gdd_real* a, const gdd_real* b, gdd_real* c, unsigned n) {
 - Comparison: `== != < <= > >=` (some host-and-device, some device-only)
 - Predicates: `is_zero / is_one / is_positive / is_negative`
 - Conversion: `to_double(a)`, `make_dd / make_td / make_qd / make_ds / make_ts / make_qs`
-- Functions: `exp / log / sin / cos / tan` for every precision
+- Functions: `exp / expm1 / log / log10 / sin / cos / tan` for every precision
+- `polyeval(c, n, x)`: degree-n polynomial by Horner's method, one
+  fused multiply-add per step (all six classes)
 - Defining `ALL_MATH` in `gqd_type.h` adds `asin/acos/atan/sinh/cosh/tanh/...`
   (**warning: compile time can stretch into hours**)
 

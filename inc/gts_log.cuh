@@ -5,4 +5,8 @@
 __device__
 gts_real log(const gts_real &a);
 
+/* Base-10 logarithm. */
+__device__
+gts_real log10(const gts_real &a);
+
 #endif /* __GTS_LOG_CUH__ */

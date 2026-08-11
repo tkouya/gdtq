@@ -274,16 +274,61 @@ Division and square root are built on these routines:
 `make bench` in test/ (or ./fmabench) reports old-vs-new timings.  On an
 NVIDIA GB10 (sm_121) with CUDA 13.0 the fused paths are:
 
-    a*b + c    gdd x1.20  gtd x1.72  gqd x1.66
-               gds x1.16  gts x1.67  gqs x1.69
-    a / b      gdd x1.43  gtd x2.08  gqd x2.58
-               gds x1.35  gts x1.89  gqs x2.93
-    sqrt(a)    gdd x1.61  gtd x1.80  gqd x2.32
-               gds x7.43  gts x1.88  gqs x2.38
+    a*b + c    gdd x1.20  gtd x1.35  gqd x1.19
+               gds x1.16  gts x1.33  gqs x1.20
+    a / b      gdd x0.47  gtd x1.40  gqd x0.81
+               gds x0.95  gts x2.40  gqs x1.39
+    sqrt(a)    gdd x1.61  gtd x1.58  gqd x1.93
+               gds x7.44  gts x1.88  gqs x2.18
+
+(The a/b entries below 1x are deliberate: 0.0.3 mirrors dtq 0.0.3 and
+forms every division residual with the div/sqrt-safe fused
+multiply-add -- three quotients for gdd, five for gqd -- trading the
+raw speed of the earlier scalar-residual shortcut for the machine-
+proved error bound of the safe residuals.)
 
 Accuracy is unchanged: test/fmatest_kernel.cu checks every routine on the
 GPU against an exact expansion-arithmetic reference computed on the host,
-and all of them stay within a few units in the last place.
+and all of them stay within a few units in the last place.  fmatest also
+exercises the fused multiply-add under complete cancellation
+(c = -(a*b)): the machine-proved formulation keeps its ordinary error
+bound |error| <= few * eps * (|a*b| + |c|) in this case, which is what
+lets polyeval run on the plain fma next to a root.
+
+
+-----------------------------------------------------------------------
+Elementary functions and polyeval (0.0.3, ported from dtq 0.0.3)
+-----------------------------------------------------------------------
+The Taylor kernels of exp / expm1 / sin / cos / sincos accumulate each
+term with one fused multiply-add, s = fma(p, 1/k!, s), instead of a
+separate multiply and add, saving one renormalization per term.  The
+convergence test uses the leading-word product, so the term itself is
+never materialized.
+
+  * `exp` for gtd_real / gqd_real uses a two-level table-driven
+    reduction, a = m log 2 + j1/64 + j2/8192 + r with |r| <= 2^-14,
+    so exp(r) needs only a short Taylor series and the ladder of 16
+    repeated squarings of the old reduction disappears.  The two exp
+    tables live in constant memory next to the sin/cos tables
+    (GQDStart() uploads them; GTDStart() truncates them to
+    triple-double).
+  * `expm1(a)` (exp(a) - 1, accurate for small |a|) is provided for
+    all six classes.
+  * `log` follows MPFR/IEEE semantics silently: log(0) = -inf,
+    log(negative) = nan.  The Newton iteration starts from the
+    logarithm of the next-lower class (gdd for gtd/gqd, gds for
+    gts/gqs), so a single iteration -- one exp of the own class --
+    reaches full precision.
+  * `log10(a)` (base-10 logarithm, log(a)/log(10)) is provided for
+    all six classes.
+  * `polyeval(c, n, x)` evaluates a degree-n polynomial by Horner's
+    method with one fused multiply-add per step, for all six classes.
+    The machine-proved fma keeps its error bound even when a step
+    cancels almost completely (near a root), so no cancellation-safe
+    special case is needed.
+  * `fma_div` of gdd_real forms its residuals with the div/sqrt-safe
+    dw_fma_safe (three-quotient correction), and gqd_real gained a
+    fifth correction quotient, mirroring dtq 0.0.3.
 
 
 -----------------------------------------------------------------------
@@ -323,6 +368,10 @@ Programs in test/
                   division and square root built on them, checked
                   against an exact expansion-arithmetic reference
   * fmabench    - old (0.0.2) vs new (0.0.3) timings for the same
+  * elembench   - GPU counterpart of the dtq-0.0.3 elem_bench: accuracy
+                  of sqrt/exp/expm1/log/log10/sin/cos and polyeval
+                  against MPFR references, special-value handling, and
+                  per-call timings (needs MPFR/GMP on the host)
 
 Run after `make`:
 
@@ -331,6 +380,7 @@ Run after `make`:
     ./sqstest
     make fmacheck      # or ./fmatest
     make bench         # or ./fmabench
+    ./elembench        # elementary functions vs MPFR + timings
 
 
 -----------------------------------------------------------------------
@@ -346,6 +396,23 @@ A short summary; see section 8 of the quick reference for more.
     reference loses ~12 digits.
   * Defining `ALL_MATH` in `gqd_type.h` enables asin/acos/atan/sinh/...
     but compile time can stretch into hours. Leave it off unless needed.
+  * Effective range of the float-based types: a gds/gts/gqs value
+    carries its full precision only while its *lowest* limb stays
+    inside the normal range of IEEE-754 single precision (>= 2^-126).
+    Since the limbs of a value x sit at about |x|, |x|*2^-24,
+    |x|*2^-48, |x|*2^-72, precision degrades gracefully (about one bit
+    per halving) once
+
+        |x| < 2^-102  (~2.0e-31)  for gds_real,
+        |x| < 2^-78   (~3.3e-24)  for gts_real,
+        |x| < 2^-54   (~5.5e-17)  for gqs_real,
+
+    independently of the algorithm that produced x -- this is a
+    representation limit of the format itself, observable e.g. as
+    division results with errors of tens of eps or more when the
+    quotient falls below the threshold.  The double-based types are
+    unaffected in practice (the corresponding thresholds are
+    2^-970 / 2^-918 / 2^-866).
 
 
 -----------------------------------------------------------------------

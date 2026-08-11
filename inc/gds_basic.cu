@@ -304,25 +304,21 @@ gds_real sloppy_div(const gds_real &a, const gds_real &b)
 	return r;
 }
 
-/* Division built on the same error-free product the branch-free FMA
-   rests on; see the gdd_real version in gdd_basic.cu for the rationale.
-   The residual a - q1*b is formed in one fused pass and is never
-   renormalized into a double-word, because only its value is needed to
-   produce the next quotient digit. */
+/* Division built on the branch-free fused multiply-add: the residual
+   a - q1*b  is one fused dw_fma instead of a multiply followed by a
+   subtraction, which removes one renormalization per step. */
 __device__
 gds_real fma_div(const gds_real &a, const gds_real &b)
 {
-	float q1 = a.x / b.x;       /* approximate quotient */
+	float q1, q2;
+	gds_real r;
 
-	float e;
-	float p = two_prod(q1, b.x, e);
-	float r = (((a.x - p) - e) + a.y) - __fmul_rn(q1, b.y);
+	q1 = a.x / b.x;              /* approximate quotient */
+	r = dw_fma(b, -q1, a);       /* r = a - q1 * b */
+	q2 = (r.x + r.y) / b.x;
 
-	float q2 = r / b.x;
-
-	float lo;
-	float hi = quick_two_sum(q1, q2, lo);
-	return make_ds(hi, lo);
+	q1 = quick_two_sum(q1, q2, q2);
+	return make_ds(q1, q2);
 }
 
 /* float-float / float-float */
@@ -558,6 +554,25 @@ gds_real operator/(float a, const gds_real &b) {
 __device__
 gds_real inv(const gds_real &a) {
   return 1.0 / a;
+}
+
+/* polyeval(c, n, x)
+   Evaluates the given n-th degree polynomial at x.
+   The polynomial is given by the array of (n+1) coefficients. */
+__device__
+gds_real polyeval(const gds_real *c, int n, const gds_real &x)
+{
+	/* Horner's method, one fused multiply-add per step.  The
+	   machine-proved fma keeps its error bound even when a step
+	   cancels almost completely (near a root), so no separate
+	   cancellation-safe variant is needed. */
+	gds_real r = c[n];
+
+	for (int i = n - 1; i >= 0; i--) {
+		r = dw_fma(r, x, c[i]);
+	}
+
+	return r;
 }
 
 #endif /* __GDS_BASIC_CU__ */

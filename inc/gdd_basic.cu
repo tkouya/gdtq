@@ -322,28 +322,30 @@ gdd_real sloppy_div(const gdd_real &a, const gdd_real &b)
 	return r;
 }
 
-/* Division built on the same error-free product the branch-free FMA
-   rests on.  Same correction sequence as sloppy_div, but the residual
-   a - q1 * b  is formed in one fused pass: two_prod is a single hardware
-   FMA, and a.x - p is exact by Sterbenz (p = fl(q1*b.x) agrees with a.x
-   to within a couple of ulps).  Only the *value* of the residual is
-   needed to get the next quotient digit, so neither the product nor the
-   difference is renormalized into a double-word -- which is what
-   sloppy_div spends most of its time on. */
+/* Division built on the branch-free fused multiply-add: each residual
+   r <- r - q*b  is one fused dw_fma instead of a multiply followed by
+   a subtraction, which removes one renormalization per step.
+   The FMA is the div/sqrt-safe variant: the residuals entering it are
+   not guaranteed non-overlapping, so no FastTwoSum precondition can be
+   asserted here (measured cost is the same as the plain dw_fma to
+   within noise, and the safe variant is never less accurate). */
 __device__
 gdd_real fma_div(const gdd_real &a, const gdd_real &b)
 {
-	double q1 = a.x / b.x;      /* approximate quotient */
+	double q1, q2, q3;
+	gdd_real r;
 
-	double e;
-	double p = two_prod(q1, b.x, e);
-	double r = (((a.x - p) - e) + a.y) - __dmul_rn(q1, b.y);
+	q1 = a.x / b.x;                /* approximate quotient */
 
-	double q2 = r / b.x;
+	r = dw_fma_safe(b, -q1, a);    /* r = a - q1 * b */
 
-	double lo;
-	double hi = quick_two_sum(q1, q2, lo);
-	return make_dd(hi, lo);
+	q2 = r.x / b.x;
+	r = dw_fma_safe(b, -q2, r);    /* r = r - q2 * b */
+
+	q3 = r.x / b.x;
+
+	q1 = quick_two_sum(q1, q2, q2);
+	return make_dd(q1, q2) + q3;
 }
 
 /* double-double / double-double */
@@ -579,6 +581,25 @@ gdd_real operator/(double a, const gdd_real &b) {
 __device__
 gdd_real inv(const gdd_real &a) {
   return 1.0 / a;
+}
+
+/* polyeval(c, n, x)
+   Evaluates the given n-th degree polynomial at x.
+   The polynomial is given by the array of (n+1) coefficients. */
+__device__
+gdd_real polyeval(const gdd_real *c, int n, const gdd_real &x)
+{
+	/* Horner's method, one fused multiply-add per step.  The
+	   machine-proved fma keeps its error bound even when a step
+	   cancels almost completely (near a root), so no separate
+	   cancellation-safe variant is needed. */
+	gdd_real r = c[n];
+
+	for (int i = n - 1; i >= 0; i--) {
+		r = dw_fma(r, x, c[i]);
+	}
+
+	return r;
 }
 
 #endif /* __GDD_BASIC_CU__ */

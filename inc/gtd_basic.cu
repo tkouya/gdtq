@@ -639,4 +639,23 @@ __host__ __device__ bool operator>=(const gtd_real &a, const gtd_real &b) { retu
 __host__ __device__ bool operator>=(const gtd_real &a, double b)          { return !(a < b); }
 __host__ __device__ bool operator>=(double a, const gtd_real &b)          { return !(a < b); }
 
+/* polyeval(c, n, x)
+   Evaluates the given n-th degree polynomial at x.
+   The polynomial is given by the array of (n+1) coefficients. */
+__device__
+gtd_real polyeval(const gtd_real *c, int n, const gtd_real &x)
+{
+	/* Horner's method, one fused multiply-add per step.  The
+	   machine-proved fma keeps its error bound even when a step
+	   cancels almost completely (near a root), so no separate
+	   cancellation-safe variant is needed. */
+	gtd_real r = c[n];
+
+	for (int i = n - 1; i >= 0; i--) {
+		r = tw_fma(r, x, c[i]);
+	}
+
+	return r;
+}
+
 #endif /* __GTD_BASIC_CU__ */

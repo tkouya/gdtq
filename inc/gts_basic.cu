@@ -475,25 +475,24 @@ gts_real standard_div(const gts_real &a, const gts_real &b)
 }
 
 /* Same correction sequence, but every residual  r <- r - q*b  is one
-   fused tw_fma instead of a multiply followed by a subtraction. */
+   fused tw_fma instead of a multiply followed by a subtraction.  The
+   machine-proved fma keeps its error bound under the near-total
+   cancellation of the residuals, so the plain variant suffices. */
 __device__
 gts_real fma_div(const gts_real &a, const gts_real &b)
 {
-	float q0, q1, q2, q3;
+	float q0, q1, q2;
 	gts_real r;
 
 	q0 = a.x / b.x;
-	r  = tw_fma_safe(b, -q0, a);      /* r = a - q0 * b */
+	r  = tw_fma(b, -q0, a);           /* r = a - q0 * b */
 
 	q1 = r.x / b.x;
-	r  = tw_fma_safe(b, -q1, r);
+	r  = tw_fma(b, -q1, r);
 
 	q2 = r.x / b.x;
-	r  = tw_fma_safe(b, -q2, r);
 
-	q3 = r.x / b.x;
-
-	return make_ts_renorm(q0, q1, q2, q3);
+	return make_ts_renorm(q0, q1, q2, 0.0f);
 }
 
 __device__
@@ -632,5 +631,24 @@ __host__ __device__ bool operator<=(float a, const gts_real &b)          { retur
 __host__ __device__ bool operator>=(const gts_real &a, const gts_real &b) { return !(a < b); }
 __host__ __device__ bool operator>=(const gts_real &a, float b)          { return !(a < b); }
 __host__ __device__ bool operator>=(float a, const gts_real &b)          { return !(a < b); }
+
+/* polyeval(c, n, x)
+   Evaluates the given n-th degree polynomial at x.
+   The polynomial is given by the array of (n+1) coefficients. */
+__device__
+gts_real polyeval(const gts_real *c, int n, const gts_real &x)
+{
+	/* Horner's method, one fused multiply-add per step.  The
+	   machine-proved fma keeps its error bound even when a step
+	   cancels almost completely (near a root), so no separate
+	   cancellation-safe variant is needed. */
+	gts_real r = c[n];
+
+	for (int i = n - 1; i >= 0; i--) {
+		r = tw_fma(r, x, c[i]);
+	}
+
+	return r;
+}
 
 #endif /* __GTS_BASIC_CU__ */

@@ -114,6 +114,11 @@ gds_real sloppy_div(const gds_real &a, const gds_real &b);
 __device__
 gds_real fma_div(const gds_real &a, const gds_real &b);
 
+/* Polynomial evaluation by Horner's method, one fused
+   multiply-add (dw_fma) per step. */
+__device__
+gds_real polyeval(const gds_real *c, int n, const gds_real &x);
+
 /* float-float / float-float */
 __device__
 gds_real operator/(const gds_real &a, const gds_real &b);

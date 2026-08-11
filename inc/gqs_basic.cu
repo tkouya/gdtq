@@ -786,7 +786,9 @@ gqs_real sloppy_div(const gqs_real &a, const gqs_real &b)
 
 /* Same correction sequence as sloppy_div, but every residual
    r <- r - q*b  is one fused qw_fma instead of a multiply followed by a
-   subtraction. */
+   subtraction.  The machine-proved fma keeps its error bound under the
+   near-total cancellation of the residuals, so the plain variant
+   suffices. */
 __device__
 gqs_real fma_div(const gqs_real &a, const gqs_real &b)
 {
@@ -795,13 +797,13 @@ gqs_real fma_div(const gqs_real &a, const gqs_real &b)
 	gqs_real r;
 
 	q0 = a.x / b.x;
-	r = qw_fma_safe(b, -q0, a);        /* r = a - q0 * b */
+	r = qw_fma(b, -q0, a);             /* r = a - q0 * b */
 
 	q1 = r.x / b.x;
-	r = qw_fma_safe(b, -q1, r);
+	r = qw_fma(b, -q1, r);
 
 	q2 = r.x / b.x;
-	r = qw_fma_safe(b, -q2, r);
+	r = qw_fma(b, -q2, r);
 
 	q3 = r.x / b.x;
 
@@ -1071,6 +1073,24 @@ gqs_real fabs(const gqs_real &a) {
 	return abs(a);
 }
 
+/* polyeval(c, n, x)
+   Evaluates the given n-th degree polynomial at x.
+   The polynomial is given by the array of (n+1) coefficients. */
+__device__
+gqs_real polyeval(const gqs_real *c, int n, const gqs_real &x)
+{
+	/* Horner's method, one fused multiply-add per step.  The
+	   machine-proved fma keeps its error bound even when a step
+	   cancels almost completely (near a root), so no separate
+	   cancellation-safe variant is needed. */
+	gqs_real r = c[n];
+
+	for (int i = n - 1; i >= 0; i--) {
+		r = qw_fma(r, x, c[i]);
+	}
+
+	return r;
+}
 
 #endif
 

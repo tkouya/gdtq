@@ -4,23 +4,38 @@
 #ifndef __GTD_LOG_CU__
 #define __GTD_LOG_CU__
 
+#include <math_constants.h>
+
 #include "gqd.cuh"
 
 /* log(a) by Newton's method on f(x) = exp(x) - a:
  *   x_{n+1} = x_n + a * exp(-x_n) - 1
- * Quadratic convergence: 53 -> 106 -> 159 bits in two iterations. */
+ * Newton doubles the number of correct digits per iteration, so start
+ * from the ~32-digit double-double logarithm (one gdd_real exp) instead
+ * of the 16-digit double one: a single triple-double iteration -- one
+ * gtd_real exp instead of two -- then reaches full precision. */
 __device__
 gtd_real log(const gtd_real &a)
 {
 	if (is_one(a))    return make_td(0.0);
-	if (a.x <= 0.0)   return make_td(0.0);   /* TODO: signal NaN/inf */
 
-	gtd_real x = make_td(log(a.x));
+	/* MPFR/IEEE semantics, silently: log(0) = -inf, log(negative) = nan. */
+	if (is_zero(a))   return make_td(-CUDART_INF);
+	if (a.x < 0.0)    return make_td(CUDART_NAN);
 
-	x = x + a * exp(negative(x)) - 1.0;
+	gdd_real x0 = log(make_dd(a.x, a.y));
+	gtd_real x = make_td(x0.x, x0.y, 0.0);
+
 	x = x + a * exp(negative(x)) - 1.0;
 
 	return x;
+}
+
+/* Base-10 logarithm. */
+__device__
+gtd_real log10(const gtd_real &a)
+{
+	return log(a) / _td_log10;
 }
 
 #endif /* __GTD_LOG_CU__ */

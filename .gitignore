@@ -12,6 +12,7 @@
 /test/sqstest
 /test/fmatest
 /test/fmabench
+/test/elembench
 
 # --- Autotools-generated files (regenerate with ./bootstrap) ---
 /autom4te.cache/

@@ -189,10 +189,12 @@ static const double s_inv_fact_d[15][4] = {
 
 /*======== initialization functions ========*/
 
-void GDSStart(const int device) {
-	printf("GDS turns on...\n");
-	CUDA_SAFE_CALL( cudaSetDevice(device) );
-
+/* Upload the float-float constant tables.  Factored out of GDSStart()
+   because the gts/gqs layers now depend on the gds elementary functions
+   (log starts from the float-float logarithm), so GTSStart() and
+   GQSStart() must make sure these tables are present as well.  The
+   upload is idempotent. */
+static void gds_upload_tables(void) {
 	gds_real h_inv_fact[n_ds_inv_fact];
 	for (int i = 0; i < n_ds_inv_fact; ++i) {
 		h_inv_fact[i] = ds_from_d2(s_inv_fact_d[i][0], s_inv_fact_d[i][1]);
@@ -209,6 +211,13 @@ void GDSStart(const int device) {
 	}
 	cutilSafeCall( cudaMemcpyToSymbol(d_ds_sin_table, h_sin_table, sizeof(gds_real)*4) );
 	cutilSafeCall( cudaMemcpyToSymbol(d_ds_cos_table, h_cos_table, sizeof(gds_real)*4) );
+}
+
+void GDSStart(const int device) {
+	printf("GDS turns on...\n");
+	CUDA_SAFE_CALL( cudaSetDevice(device) );
+
+	gds_upload_tables();
 
 	printf("\tdone.\n");
 }
@@ -222,6 +231,10 @@ void GDSEnd() {
 void GTSStart(const int device) {
 	printf("GTS turns on...\n");
 	CUDA_SAFE_CALL( cudaSetDevice(device) );
+
+	/* gts log starts from the float-float logarithm; make sure the
+	   gds tables are present even if GDSStart() was never called. */
+	gds_upload_tables();
 
 	gts_real h_inv_fact[n_ts_inv_fact];
 	for (int i = 0; i < n_ts_inv_fact; ++i) {
@@ -251,6 +264,10 @@ void GTSEnd() {
 void GQSStart(const int device) {
 	printf("GQS turns on...\n");
 	CUDA_SAFE_CALL( cudaSetDevice(device) );
+
+	/* gqs log starts from the float-float logarithm; make sure the
+	   gds tables are present even if GDSStart() was never called. */
+	gds_upload_tables();
 
 	gqs_real *h_inv_fact = (gqs_real*)malloc(sizeof(gqs_real)*n_qs_inv_fact);
 	for (int i = 0; i < n_qs_inv_fact; ++i) {

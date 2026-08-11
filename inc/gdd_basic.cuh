@@ -129,6 +129,11 @@ gdd_real sloppy_div(const gdd_real &a, const gdd_real &b);
 __device__
 gdd_real fma_div(const gdd_real &a, const gdd_real &b);
 
+/* Polynomial evaluation by Horner's method, one fused
+   multiply-add (dw_fma) per step. */
+__device__
+gdd_real polyeval(const gdd_real *c, int n, const gdd_real &x);
+
 /* double-double / double-double */
 __device__
 gdd_real operator/(const gdd_real &a, const gdd_real &b);

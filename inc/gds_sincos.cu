@@ -10,7 +10,8 @@
 __device__
 gds_real sin_taylor(const gds_real &a) {
 	const float thresh = 0.5 * fabs(to_float(a)) * _ds_eps;
-  	gds_real r, s, t, x;
+  	gds_real r, s, x;
+	float tmag;
 
   	if (is_zero(a)) {
     		return make_ds(0.0);
@@ -22,10 +23,12 @@ gds_real sin_taylor(const gds_real &a) {
 	r = a;
   	do {
    		r = r*x;
-    		t = r * ds_inv_fact[i];
-    		s = s + t;
+		/* s += r / i!, fused; the term magnitude for the convergence
+		   test is estimated from the leading words. */
+		tmag = fabs(to_float(r) * ds_inv_fact[i].x);
+		s = dw_fma(r, ds_inv_fact[i], s);
     		i += 2;
-  	} while (i < n_ds_inv_fact && fabs(to_float(t)) > thresh);
+  	} while (i < n_ds_inv_fact && tmag > thresh);
 
 	return s;
 }
@@ -33,7 +36,8 @@ gds_real sin_taylor(const gds_real &a) {
 __device__
 gds_real cos_taylor(const gds_real &a) {
 	const float thresh = 0.5 * _ds_eps;
-  	gds_real r, s, t, x;
+  	gds_real r, s, x;
+	float tmag;
 	int i = 1;
 
   	if (is_zero(a)) {
@@ -45,10 +49,10 @@ gds_real cos_taylor(const gds_real &a) {
   	s = 1.0 + mul_pwr2(r, 0.5);
   	do {
     		r = r*x;
-    		t = r * ds_inv_fact[i];
-    		s = s + t;
+		tmag = fabs(to_float(r) * ds_inv_fact[i].x);
+		s = dw_fma(r, ds_inv_fact[i], s);
     		i += 2;
-  	} while (i < n_ds_inv_fact && fabs(to_float(t)) > thresh);
+  	} while (i < n_ds_inv_fact && tmag > thresh);
 
   	return s;
 }

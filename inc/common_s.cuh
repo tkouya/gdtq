@@ -56,6 +56,7 @@ gqs_real make_qs( const float x );
 #define _ds_eps   (1.4210854715202004e-14f)            /* 2^-46 */
 #define _ds_e     make_ds(2.71828175e+00f,  8.25484037e-08f)
 #define _ds_log2  make_ds(6.93147182e-01f, -1.90465421e-09f)
+#define _ds_log10 make_ds(2.30258512e+00f, -3.19754356e-08f)
 #define _ds_2pi   make_ds(6.28318548e+00f, -1.74845553e-07f)
 #define _ds_pi    make_ds(3.14159274e+00f, -8.74227766e-08f)
 #define _ds_pi2   make_ds(1.57079637e+00f, -4.37113883e-08f)
@@ -67,6 +68,7 @@ gqs_real make_qs( const float x );
 #define _ts_eps   (8.4703294725430034e-22f)            /* ~ 2^-70  (3*24-2 bits) */
 #define _ts_e     make_ts(2.71828175e+00f,  8.25484037e-08f, -2.96405987e-15f)
 #define _ts_log2  make_ts(6.93147182e-01f, -1.90465421e-09f, -8.78318374e-17f)
+#define _ts_log10 make_ts(2.30258512e+00f, -3.19754356e-08f, -1.10525401e-15f)
 #define _ts_2pi   make_ts(6.28318548e+00f, -1.74845553e-07f, -6.86049804e-15f)
 #define _ts_pi    make_ts(3.14159274e+00f, -8.74227766e-08f, -3.43024902e-15f)
 #define _ts_pi2   make_ts(1.57079637e+00f, -4.37113883e-08f, -1.71512451e-15f)
@@ -77,6 +79,7 @@ gqs_real make_qs( const float x );
 #define _qs_eps   (5.0487894595025505e-29f)            /* ~ 2^-93  (4*24-3 bits) */
 #define _qs_e     make_qs(2.71828175e+00f,  8.25484037e-08f, -2.96405987e-15f,  9.26442286e-23f)
 #define _qs_log2  make_qs(6.93147182e-01f, -1.90465421e-09f, -8.78318374e-17f,  2.89513214e-24f)
+#define _qs_log10 make_qs(2.30258512e+00f, -3.19754356e-08f, -1.10525401e-15f, -3.03191431e-23f)
 #define _qs_2pi   make_qs(6.28318548e+00f, -1.74845553e-07f, -6.86049804e-15f,  5.29395592e-23f)
 #define _qs_pi    make_qs(3.14159274e+00f, -8.74227766e-08f, -3.43024902e-15f,  2.64697796e-23f)
 #define _qs_pi2   make_qs(1.57079637e+00f, -4.37113883e-08f, -1.71512451e-15f,  1.32348898e-23f)

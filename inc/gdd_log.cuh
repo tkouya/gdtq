@@ -8,6 +8,10 @@
 __device__
 gdd_real log(const gdd_real &a);
 
+/* Base-10 logarithm. */
+__device__
+gdd_real log10(const gdd_real &a);
+
 #endif /* __GDD_LOG_CUH__ */
 
 

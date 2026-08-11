@@ -93,6 +93,11 @@ gtd_real standard_div(const gtd_real &a, const gtd_real &b);
 __device__
 gtd_real fma_div(const gtd_real &a, const gtd_real &b);
 
+/* Polynomial evaluation by Horner's method, one fused
+   multiply-add (tw_fma) per step. */
+__device__
+gtd_real polyeval(const gtd_real *c, int n, const gtd_real &x);
+
 __device__
 gtd_real operator/(const gtd_real &a, const gtd_real &b);
 

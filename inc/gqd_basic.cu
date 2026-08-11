@@ -797,7 +797,7 @@ gqd_real sloppy_div(const gqd_real &a, const gqd_real &b)
 __device__
 gqd_real fma_div(const gqd_real &a, const gqd_real &b)
 {
-	double q0, q1, q2, q3;
+	double q0, q1, q2, q3, q4;
 
 	gqd_real r;
 
@@ -811,8 +811,11 @@ gqd_real fma_div(const gqd_real &a, const gqd_real &b)
 	r = qw_fma_safe(b, -q2, r);
 
 	q3 = r.x / b.x;
+	r = qw_fma_safe(b, -q3, r);
 
-	renorm(q0, q1, q2, q3);
+	q4 = r.x / b.x;
+
+	renorm(q0, q1, q2, q3, q4);
 
 	return make_qd(q0, q1, q2, q3);
 }
@@ -1078,6 +1081,24 @@ gqd_real fabs(const gqd_real &a) {
 	return abs(a);
 }
 
+/* polyeval(c, n, x)
+   Evaluates the given n-th degree polynomial at x.
+   The polynomial is given by the array of (n+1) coefficients. */
+__device__
+gqd_real polyeval(const gqd_real *c, int n, const gqd_real &x)
+{
+	/* Horner's method, one fused multiply-add per step.  The
+	   machine-proved fma keeps its error bound even when a step
+	   cancels almost completely (near a root), so no separate
+	   cancellation-safe variant is needed. */
+	gqd_real r = c[n];
+
+	for (int i = n - 1; i >= 0; i--) {
+		r = qw_fma(r, x, c[i]);
+	}
+
+	return r;
+}
 
 #endif
 

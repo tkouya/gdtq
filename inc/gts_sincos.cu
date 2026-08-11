@@ -19,7 +19,8 @@ __device__
 void sincos_taylor(const gts_real &a, gts_real &sin_a, gts_real &cos_a)
 {
 	const float thresh = 0.5 * _ts_eps * fabs(to_float(a));
-	gts_real p, s, t, x;
+	gts_real p, s, x;
+	float tmag;
 
 	if (is_zero(a)) {
 		sin_a = make_ts(0.0);
@@ -33,10 +34,12 @@ void sincos_taylor(const gts_real &a, gts_real &sin_a, gts_real &cos_a)
 	int i = 0;
 	do {
 		p = p * x;
-		t = p * ts_inv_fact[i];
-		s = s + t;
+		/* s += p / i!, fused; the term magnitude for the convergence
+		   test is estimated from the leading words. */
+		tmag = fabs(to_float(p) * ts_inv_fact[i].x);
+		s = tw_fma(p, ts_inv_fact[i], s);
 		i = i + 2;
-	} while (i < n_ts_inv_fact && fabs(to_float(t)) > thresh);
+	} while (i < n_ts_inv_fact && tmag > thresh);
 
 	sin_a = s;
 	cos_a = sqrt(make_ts(1.0) - sqr(s));
@@ -46,7 +49,8 @@ __device__
 gts_real sin_taylor(const gts_real &a)
 {
 	const float thresh = 0.5 * _ts_eps * fabs(to_float(a));
-	gts_real p, s, t, x;
+	gts_real p, s, x;
+	float tmag;
 
 	if (is_zero(a)) return make_ts(0.0);
 
@@ -56,10 +60,10 @@ gts_real sin_taylor(const gts_real &a)
 	int i = 0;
 	do {
 		p = p * x;
-		t = p * ts_inv_fact[i];
-		s = s + t;
+		tmag = fabs(to_float(p) * ts_inv_fact[i].x);
+		s = tw_fma(p, ts_inv_fact[i], s);
 		i += 2;
-	} while (i < n_ts_inv_fact && fabs(to_float(t)) > thresh);
+	} while (i < n_ts_inv_fact && tmag > thresh);
 
 	return s;
 }
@@ -68,7 +72,8 @@ __device__
 gts_real cos_taylor(const gts_real &a)
 {
 	const float thresh = 0.5 * _ts_eps;
-	gts_real p, s, t, x;
+	gts_real p, s, x;
+	float tmag;
 
 	if (is_zero(a)) return make_ts(1.0);
 
@@ -78,10 +83,10 @@ gts_real cos_taylor(const gts_real &a)
 	int i = 1;
 	do {
 		p = p * x;
-		t = p * ts_inv_fact[i];
-		s = s + t;
+		tmag = fabs(to_float(p) * ts_inv_fact[i].x);
+		s = tw_fma(p, ts_inv_fact[i], s);
 		i += 2;
-	} while (i < n_ts_inv_fact && fabs(to_float(t)) > thresh);
+	} while (i < n_ts_inv_fact && tmag > thresh);
 
 	return s;
 }

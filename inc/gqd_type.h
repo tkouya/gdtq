@@ -37,6 +37,11 @@ typedef double3 gtd_real; // TD
 typedef double4 gqd_real; // QD
 
 /* float-precision based (added 2026, mirrors dtq-0.0.2 ds/ts/qs_real) */
+/* Full precision holds only while the lowest limb (~|x|*2^-24 per word)
+ * stays in the float normal range (>= 2^-126); below the per-type
+ * threshold, precision degrades by about one bit per halving
+ * (representation limit of the format itself, independent of the
+ * algorithm):  |x| >= 2^-102 (gds) / 2^-78 (gts) / 2^-54 (gqs). */
 typedef float2  gds_real; // DS = double-single (2 floats, ~14 digits)
 typedef float3  gts_real; // TS = triple-single (3 floats, ~21 digits)
 typedef float4  gqs_real; // QS = quadruple-single (4 floats, ~28 digits)

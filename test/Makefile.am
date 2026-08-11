@@ -15,7 +15,7 @@ AM_CPPFLAGS = \
 
 AM_CXXFLAGS = -O3 $(OPENMP_CXXFLAGS)
 
-noinst_PROGRAMS = benchmark sqstest fmatest fmabench
+noinst_PROGRAMS = benchmark sqstest fmatest fmabench elembench
 
 ## ======== benchmark (double layers) =================================
 benchmark_SOURCES = \
@@ -69,6 +69,16 @@ nodist_EXTRA_fmabench_SOURCES = dummy.cxx
 fmabench_LDADD   = fmabench_kernel.$(OBJEXT) @CUDA_LIBS@
 fmabench_LDFLAGS = @CUDA_SDK_LDFLAGS@ @CUDA_LDFLAGS@
 fmabench_DEPENDENCIES = fmabench_kernel.$(OBJEXT)
+
+## ======== elembench (elementary functions, standalone) ==============
+## GPU counterpart of the dtq-0.0.3 elem_bench: accuracy of the
+## elementary functions and polyeval against MPFR references, plus
+## per-call timings.  Needs MPFR/GMP on the host side only.
+elembench_SOURCES =
+nodist_EXTRA_elembench_SOURCES = dummy.cxx
+elembench_LDADD   = elembench_kernel.$(OBJEXT) @CUDA_LIBS@ -lmpfr -lgmp
+elembench_LDFLAGS = @CUDA_SDK_LDFLAGS@ @CUDA_LDFLAGS@
+elembench_DEPENDENCIES = elembench_kernel.$(OBJEXT)
 
 ## ======== nvcc rules ================================================
 
@@ -160,6 +170,11 @@ fmabench_kernel.$(OBJEXT): fmabench_kernel.cu $(KERNEL_DEPS)
 	    $(NVCC_DEFS) $(NVCC_INCLUDES) \
 	    -c $(srcdir)/fmabench_kernel.cu -o $@
 
+elembench_kernel.$(OBJEXT): elembench_kernel.cu $(KERNEL_DEPS) $(KERNEL_S_DEPS)
+	@NVCC@ @NVCC_FLAGS@ -arch=@CUDA_ARCH@ \
+	    $(NVCC_DEFS) $(NVCC_INCLUDES) \
+	    -c $(srcdir)/elembench_kernel.cu -o $@
+
 ## Convenience targets: run the FMA accuracy test / benchmark.
 fmacheck: fmatest$(EXEEXT)
 	./fmatest$(EXEEXT)
@@ -167,16 +182,21 @@ fmacheck: fmatest$(EXEEXT)
 bench: fmabench$(EXEEXT)
 	./fmabench$(EXEEXT)
 
-.PHONY: fmacheck bench
+elembench-run: elembench$(EXEEXT)
+	./elembench$(EXEEXT)
+
+.PHONY: fmacheck bench elembench-run
 
 CLEANFILES = gqdtest_kernel.$(OBJEXT) sqstest_kernel.$(OBJEXT) \
-	fmatest_kernel.$(OBJEXT) fmabench_kernel.$(OBJEXT)
+	fmatest_kernel.$(OBJEXT) fmabench_kernel.$(OBJEXT) \
+	elembench_kernel.$(OBJEXT)
 
 EXTRA_DIST = \
 	gqdtest_kernel.cu \
 	sqstest_kernel.cu \
 	fmatest_kernel.cu \
 	fmabench_kernel.cu \
+	elembench_kernel.cu \
 	clean.sh \
 	make.sh \
 	README_CUDA13_FIX.md

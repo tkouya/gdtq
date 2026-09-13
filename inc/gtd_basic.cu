@@ -318,7 +318,9 @@ gtd_real sqr(const gtd_real &a)
 // No branch anywhere, and a*b is never renormalized on its own.
 /* TW-FMA  z = a * b + c   (72 flops)
    Machine-proved with FPANVerifier + z3 5.0.0 (ACS2026 formulation):
-     error bound      |z-(ab+c)| <= 184 u^3 (|ab|+|c|)
+     error bound      |z-(ab+c)| <= 187 u^3 (|ab|+|c|)
+                      (FPANVerifier anchor-relative 184 u^3 plus the
+                       analytic input-relative conversion)
      every FastTwoSum precondition  exp(x) >= exp(y)
      non-overlapping output         z0 |> z1 |> z2   (strongly_dominates)
    Normalization repeats a cascade over adjacent pairs; the pass count is the
@@ -358,7 +360,9 @@ gtd_real tw_fma(const gtd_real &a, const gtd_real &b, const gtd_real &c)
 
 /* TW-FMA  z = a * b + c   (72 flops, scalar multiplier)
    Machine-proved with FPANVerifier + z3 5.0.0 (ACS2026 formulation):
-     error bound      |z-(ab+c)| <= 184 u^3 (|ab|+|c|)
+     error bound      |z-(ab+c)| <= 187 u^3 (|ab|+|c|)
+                      (FPANVerifier anchor-relative 184 u^3 plus the
+                       analytic input-relative conversion)
      every FastTwoSum precondition  exp(x) >= exp(y)
      non-overlapping output         z0 |> z1 |> z2   (strongly_dominates)
    Normalization repeats a cascade over adjacent pairs; the pass count is the

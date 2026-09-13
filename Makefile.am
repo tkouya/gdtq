@@ -13,5 +13,5 @@ endif
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = gqd.pc gqd-shared.pc
 
-EXTRA_DIST = LICENSE README README.md bootstrap m4/ax_cuda.m4 \
+EXTRA_DIST = LICENSE NEWS README README.md bootstrap m4/ax_cuda.m4 \
 	gqd.pc.in gqd-shared.pc.in

@@ -103,6 +103,20 @@ AC_ARG_ENABLE([benchmark],
   [enable_benchmark=$enableval], [enable_benchmark=yes])
 AM_CONDITIONAL([ENABLE_BENCHMARK], [test "x$enable_benchmark" = "xyes"])
 
+dnl ---- elementary functions ----
+dnl By default exp, log, sin, cos, ... of all six classes are the table-driven
+dnl multi-word kernels of gdtq 0.0.4 (inc/mw/, inc/gq[ds]_elem.cu).
+dnl --enable-legacy-elementary builds the 0.0.3 implementations of the
+dnl functions that 0.0.3 provided (the new ones always use the kernels).
+AC_ARG_ENABLE([legacy-elementary],
+  [AS_HELP_STRING([--enable-legacy-elementary],
+    [use the gdtq 0.0.3 implementations of exp/expm1/log/log10/sin/cos/tan/sincos (and of the ALL_MATH functions) instead of the 0.0.4 kernels])],
+  [enable_legacy_elementary=$enableval], [enable_legacy_elementary=no])
+AS_IF([test "x$enable_legacy_elementary" = "xyes"],
+  [NVCC_FLAGS="$NVCC_FLAGS -DGDTQ_LEGACY_ELEMENTARY"
+   ELEM_IMPL="legacy (0.0.3)"],
+  [ELEM_IMPL="multi-word kernels (0.0.4)"])
+
 AC_CONFIG_FILES([
   Makefile
   inc/Makefile
@@ -133,4 +147,5 @@ echo "    type             : ${TDLIB_TYPE}"
 echo "    link             : ${TDLIB_LDFLAGS} ${TDLIB_LIBS}"
 ])
 echo "  build benchmark    : ${enable_benchmark}"
+echo "  elementary funcs   : ${ELEM_IMPL}"
 echo ""

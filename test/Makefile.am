@@ -15,7 +15,7 @@ AM_CPPFLAGS = \
 
 AM_CXXFLAGS = -O3 $(OPENMP_CXXFLAGS)
 
-noinst_PROGRAMS = benchmark sqstest fmatest fmabench elembench
+noinst_PROGRAMS = benchmark sqstest fmatest fmabench elembench fmaref
 
 ## ======== benchmark (double layers) =================================
 benchmark_SOURCES = \
@@ -64,6 +64,15 @@ fmatest_LDADD   = fmatest_kernel.$(OBJEXT) @CUDA_LIBS@
 fmatest_LDFLAGS = @CUDA_SDK_LDFLAGS@ @CUDA_LDFLAGS@
 fmatest_DEPENDENCIES = fmatest_kernel.$(OBJEXT)
 
+## fmaref (0.0.4): bitwise conformance of dw/tw/qw_fma and the
+## div/sqrt-safe variants with a host transcription of the machine-proved
+## reference fma_ref.c (DW 17 / TW 72 / QW 176 flops, safe 20 / 84 / 206).
+fmaref_SOURCES =
+nodist_EXTRA_fmaref_SOURCES = dummy.cxx
+fmaref_LDADD   = fmaref_kernel.$(OBJEXT) @CUDA_LIBS@
+fmaref_LDFLAGS = @CUDA_SDK_LDFLAGS@ @CUDA_LDFLAGS@
+fmaref_DEPENDENCIES = fmaref_kernel.$(OBJEXT)
+
 fmabench_SOURCES =
 nodist_EXTRA_fmabench_SOURCES = dummy.cxx
 fmabench_LDADD   = fmabench_kernel.$(OBJEXT) @CUDA_LIBS@
@@ -87,6 +96,13 @@ NVCC_INCLUDES = \
 	@CUDA_SDK_INCLUDE@
 
 NVCC_DEFS = -D__NV_NO_VECTOR_DEPRECATION_DIAG
+
+## elementary functions (gdtq 0.0.4): mw kernels behind gqd_elem.cu / gqs_elem.cu
+ELEM_DEPS = \
+	$(top_srcdir)/inc/gqd_elem.cu   $(top_srcdir)/inc/gqs_elem.cu \
+	$(top_srcdir)/inc/gdtq_mw.cuh   $(top_srcdir)/inc/gdtq_twopass.cuh \
+	$(top_srcdir)/inc/mw/mw_arith.h $(top_srcdir)/inc/mw/mw_elem.h \
+	$(top_srcdir)/inc/mw/mw_tables.h $(top_srcdir)/inc/mw/mw_twopass.cuh
 
 KERNEL_DEPS = \
 	$(top_srcdir)/inc/gqd.cu        $(top_srcdir)/inc/gqd.cuh \
@@ -126,6 +142,7 @@ KERNEL_DEPS = \
 	$(top_srcdir)/inc/gqs_exp.cu    $(top_srcdir)/inc/gqs_exp.cuh \
 	$(top_srcdir)/inc/gqs_log.cu    $(top_srcdir)/inc/gqs_log.cuh \
 	$(top_srcdir)/inc/gqs_sincos.cu $(top_srcdir)/inc/gqs_sincos.cuh \
+	$(ELEM_DEPS) \
 	$(top_srcdir)/inc/gqd_type.h
 
 KERNEL_S_DEPS = \
@@ -148,6 +165,7 @@ KERNEL_S_DEPS = \
 	$(top_srcdir)/inc/gqs_exp.cu    $(top_srcdir)/inc/gqs_exp.cuh \
 	$(top_srcdir)/inc/gqs_log.cu    $(top_srcdir)/inc/gqs_log.cuh \
 	$(top_srcdir)/inc/gqs_sincos.cu $(top_srcdir)/inc/gqs_sincos.cuh \
+	$(ELEM_DEPS) \
 	$(top_srcdir)/inc/gqd_type.h
 
 gqdtest_kernel.$(OBJEXT): gqdtest_kernel.cu $(KERNEL_DEPS)
@@ -165,6 +183,12 @@ fmatest_kernel.$(OBJEXT): fmatest_kernel.cu $(KERNEL_DEPS)
 	    $(NVCC_DEFS) $(NVCC_INCLUDES) \
 	    -c $(srcdir)/fmatest_kernel.cu -o $@
 
+## the host reference must not be contracted into FMAs
+fmaref_kernel.$(OBJEXT): fmaref_kernel.cu $(KERNEL_DEPS)
+	@NVCC@ @NVCC_FLAGS@ -arch=@CUDA_ARCH@ -Xcompiler -ffp-contract=off \
+	    $(NVCC_DEFS) $(NVCC_INCLUDES) \
+	    -c $(srcdir)/fmaref_kernel.cu -o $@
+
 fmabench_kernel.$(OBJEXT): fmabench_kernel.cu $(KERNEL_DEPS)
 	@NVCC@ @NVCC_FLAGS@ -arch=@CUDA_ARCH@ \
 	    $(NVCC_DEFS) $(NVCC_INCLUDES) \
@@ -176,8 +200,9 @@ elembench_kernel.$(OBJEXT): elembench_kernel.cu $(KERNEL_DEPS) $(KERNEL_S_DEPS)
 	    -c $(srcdir)/elembench_kernel.cu -o $@
 
 ## Convenience targets: run the FMA accuracy test / benchmark.
-fmacheck: fmatest$(EXEEXT)
+fmacheck: fmatest$(EXEEXT) fmaref$(EXEEXT)
 	./fmatest$(EXEEXT)
+	./fmaref$(EXEEXT)
 
 bench: fmabench$(EXEEXT)
 	./fmabench$(EXEEXT)
@@ -189,7 +214,7 @@ elembench-run: elembench$(EXEEXT)
 
 CLEANFILES = gqdtest_kernel.$(OBJEXT) sqstest_kernel.$(OBJEXT) \
 	fmatest_kernel.$(OBJEXT) fmabench_kernel.$(OBJEXT) \
-	elembench_kernel.$(OBJEXT)
+	elembench_kernel.$(OBJEXT) fmaref_kernel.$(OBJEXT)
 
 EXTRA_DIST = \
 	gqdtest_kernel.cu \
@@ -197,6 +222,7 @@ EXTRA_DIST = \
 	fmatest_kernel.cu \
 	fmabench_kernel.cu \
 	elembench_kernel.cu \
+	fmaref_kernel.cu \
 	clean.sh \
 	make.sh \
 	README_CUDA13_FIX.md

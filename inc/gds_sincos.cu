@@ -71,6 +71,8 @@ void sincos_taylor(const gds_real &a, gds_real &sin_a, gds_real &cos_a) {
 
 
 
+#if defined(GDTQ_LEGACY_ELEMENTARY)  /* 0.0.3 implementation; default: mw kernels in gqs_elem.cu */
+
 __device__
 gds_real sin(const gds_real &a) {  
 
@@ -316,7 +318,10 @@ gds_real tan(const gds_real &a) {
 }
 
 
-#ifndef ALL_MATH
+#endif /* GDTQ_LEGACY_ELEMENTARY */
+
+/* 0.0.3 advanced functions (ALL_MATH keeps its 0.0.3 meaning in legacy builds) */
+#if defined(GDTQ_LEGACY_ELEMENTARY) && !defined(ALL_MATH)
 
 __device__
 gds_real atan2(const gds_real &y, const gds_real &x) {
@@ -498,7 +503,7 @@ gds_real atanh(const gds_real &a) {
 }
 
 
-#endif /* ALL_MATH */
+#endif /* GDTQ_LEGACY_ELEMENTARY && ALL_MATH */
 
 
 #endif /* __GDS_SIN_COS_CU__ */

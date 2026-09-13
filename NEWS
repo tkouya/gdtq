@@ -1,0 +1,38 @@
+Changes for gdtq 0.0.4 (in preparation, branch elementary-core)
+  - New elementary functions for all six classes: the table-driven
+    multi-word kernels of the CORE-dtq project (inc/mw/, wrapped by
+    inc/gqd_elem.cu and inc/gqs_elem.cu through inc/gdtq_mw.cuh), the GPU
+    counterpart of the dtq 0.0.4 functions:
+      exp expm1 log log10 log1p sin cos tan sincos asin acos atan atan2
+      sinh cosh tanh sincosh asinh acosh atanh pow
+    Two-level table reduction with (K+1)-word tables, Cody-Waite and
+    Payne-Hanek reduction, mixed-width Horner schemes, accurate
+    reconstruction; double words for gdd/gtd/gqd, float words for
+    gds/gts/gqs.  Max. errors against MPFR on the GB10: 4.3 u^2 (DD),
+    8.3 u^3 (TD), 11.6 u^4 (QD), 4.4 / 7.7 / 13.7 u^K (DS/TS/QS), against
+    up to 10^6-10^13 u^K for 0.0.3; faster by 2.7x (DD), 4.0x (TD),
+    4.8x (QD), 2.5x (DS), 10.7x (TS), 9.8x (QS) (geometric means).
+  - New functions: log1p and pow for all classes; atan2, atan, asin, acos,
+    sinh, cosh, tanh, sincosh, asinh, acosh, atanh for gtd_real/gts_real
+    and (without ALL_MATH) gqd_real/gqs_real.  ALL_MATH is no longer needed.
+  - inc/gdtq_twopass.cuh (optional, header-only): array evaluation with the
+    two-pass / partitioned schedules (results bitwise identical).
+  - configure --enable-legacy-elementary (-DGDTQ_LEGACY_ELEMENTARY) keeps
+    the 0.0.3 implementations of the functions 0.0.3 provided (with the
+    0.0.3 meaning of ALL_MATH); the new functions still use the kernels.
+  - sqrt and the fused multiply-add are unchanged.  The FMA comments now
+    state the certified bounds 35 u^2 / 187 u^3 / 822 u^4 (|ab|+|c|)
+    (FPANVerifier anchor-relative 34/184/812 plus the analytic conversion).
+  - Tests: test/elembench covers all functions; new test/fmaref checks
+    dw/tw/qw_fma, the scalar-multiplier versions and the div/sqrt-safe
+    variants bitwise against a host transcription of the machine-proved
+    reference (DW 17 / TW 72 / QW 176 flops, safe 20 / 84 / 206); run by
+    `make fmacheck` in test/.
+
+Changes for gdtq 0.0.3
+  - Branch-free multi-word fused multiply-add (machine-proved formulation),
+    division and square root built on it, elementary functions and
+    polyeval ported from dtq 0.0.3.  See README.md.
+
+Changes for gdtq 0.0.2
+  - Float-based classes gds_real / gts_real / gqs_real.

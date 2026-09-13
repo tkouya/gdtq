@@ -206,10 +206,18 @@ void run_dd_add(const gdd_real* a, const gdd_real* b, gdd_real* c, unsigned n) {
 - 比較: `== != < <= > >=`（一部 host/device 両対応）
 - 述語: `is_zero / is_one / is_positive / is_negative`
 - 変換: `to_double(a)`、`make_dd / make_td / make_qd / make_ds / make_ts / make_qs`
-- 関数: `exp / expm1 / log / log10 / sin / cos / tan`（DD/TD/QD/DS/TS/QS すべて）
+- 関数（DD/TD/QD/DS/TS/QS すべて。0.0.4 ではテーブル型の多語カーネル，
+  `inc/gdtq_mw.cuh` 参照）: `exp / expm1 / log / log10 / log1p / sin / cos /
+  tan / sincos / asin / acos / atan / atan2 / sinh / cosh / tanh / sincosh /
+  asinh / acosh / atanh / pow(a, b)`
 - `polyeval(c, n, x)`: Horner 法による n 次多項式評価(全 6 クラス、
   1 ステップ 1 融合積和)
-- `ALL_MATH` を `gqd_type.h` で有効にすると `asin/acos/atan/sinh/cosh/tanh/...` も入る
+- 配列: `gdtq_twopass.cuh` はデバイス配列に 2 パス／分割評価で関数を適用する
+  （結果はビット単位で同一．巨大引数の混じる sin/cos/tan や，FP64 の弱い GPU
+  での sinh/cosh/tanh/expm1/asinh/acosh で速い）
+- `ALL_MATH`（`gqd_type.h`）が意味を持つのは `-DGDTQ_LEGACY_ELEMENTARY`
+  （`configure --enable-legacy-elementary`）のビルドだけで，0.0.3 と同じく
+  0.0.3 版の asin/acos/atan/sinh/... を選ぶ
   （**コンパイル時間が数時間に達することがある** ので注意）
 
 ### 6.1b 分岐なし積和演算（fused multiply-add, 0.0.3 で追加）
@@ -348,7 +356,7 @@ C リンカを直接使うと `libstdc++` のシンボル（`__cxa_guard_acquire
 | Two-Sum が壊れて exp/log の精度が～10¹² eps 落ちる | ホスト側 CPU 比較に使う QD/dd_real のビルドで FMA 融合が起きている。CPU 側を `-ffp-contract=off` でビルドする（dtq 側のメモも参照） |
 | ホスト `.cpp` でリンクエラー | `qd` ライブラリの `fpu_fix_start/end` を呼んでいない、または `-lqd` の付け忘れ |
 | C リンカで未定義シンボル | リンカを `g++`／`nvcc` に切替。Automake なら `nodist_EXTRA_xxx_SOURCES = dummy.cxx` |
-| sin/cos/tan が遅すぎ／コンパイルが終わらない | `gqd_type.h` の `ALL_MATH` を有効にしたまま。要らなければ無効化 |
+| sin/cos/tan が遅すぎ／コンパイルが終わらない | legacy ビルド（`-DGDTQ_LEGACY_ELEMENTARY`）で `gqd_type.h` の `ALL_MATH` を有効にしたまま。0.0.4 の既定ビルドでは `ALL_MATH` は不要 |
 
 ---
 

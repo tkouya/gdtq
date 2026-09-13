@@ -27,7 +27,9 @@ __device__
 gdd_real tan(const gdd_real &a);
 
 
-#ifndef ALL_MATH
+/* always available (gdtq 0.0.4: mw kernels, see gqd_elem.cu).  A
+   GDTQ_LEGACY_ELEMENTARY build uses the 0.0.3 versions of these when
+   0.0.3 compiled them, i.e. without ALL_MATH (gqd_type.h). */
 
 __device__
 gdd_real atan2(const gdd_real &y, const gdd_real &x);
@@ -62,7 +64,6 @@ gdd_real acosh(const gdd_real &a);
 __device__
 gdd_real atanh(const gdd_real &a);
 
-#endif /* ALL_MATH */
 
 
 #endif /* __GDD_SIN_COS_CUH__ */

@@ -8,6 +8,8 @@
 
 #include "gqs.cuh"
 
+#if defined(GDTQ_LEGACY_ELEMENTARY)  /* 0.0.3 implementation; default: mw kernels in gqs_elem.cu */
+
 /* Taylor series for exp(r), |r| < 1/k, with argument reduction
  *   exp(a) = 2^m * (exp(r))^k,    m = round(a/log2),  r = (a - m*log2)/k
  * k = 2^16 keeps |r| < ~6e-6, then 16 self-squarings undo the scaling.
@@ -93,5 +95,7 @@ gts_real expm1(const gts_real &a)
 
 	return s;      /* = exp(a) - 1, no +1 */
 }
+
+#endif /* GDTQ_LEGACY_ELEMENTARY */
 
 #endif /* __GTS_EXP_CU__ */

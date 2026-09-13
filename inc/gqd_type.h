@@ -26,6 +26,10 @@
  * atan, acos, asin, sinh, cosh, tanh, asinh, acosh, atanh
  * WARNING: these functions take long time to compile,
  * e.g., several hours
+ *
+ * gdtq 0.0.4: only for builds with GDTQ_LEGACY_ELEMENTARY (the 0.0.3
+ * implementations); by default all functions of all classes come from the
+ * multi-word kernels (gqd_elem.cu / gqs_elem.cu) and ALL_MATH is ignored.
  * */
 //#define ALL_MATH
 

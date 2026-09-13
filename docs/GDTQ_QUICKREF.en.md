@@ -211,11 +211,20 @@ void run_dd_add(const gdd_real* a, const gdd_real* b, gdd_real* c, unsigned n) {
 - Comparison: `== != < <= > >=` (some host-and-device, some device-only)
 - Predicates: `is_zero / is_one / is_positive / is_negative`
 - Conversion: `to_double(a)`, `make_dd / make_td / make_qd / make_ds / make_ts / make_qs`
-- Functions: `exp / expm1 / log / log10 / sin / cos / tan` for every precision
+- Functions (every precision; 0.0.4: table-driven multi-word kernels, see
+  `inc/gdtq_mw.cuh`): `exp / expm1 / log / log10 / log1p / sin / cos / tan /
+  sincos / asin / acos / atan / atan2 / sinh / cosh / tanh / sincosh /
+  asinh / acosh / atanh / pow(a, b)`
 - `polyeval(c, n, x)`: degree-n polynomial by Horner's method, one
   fused multiply-add per step (all six classes)
-- Defining `ALL_MATH` in `gqd_type.h` adds `asin/acos/atan/sinh/cosh/tanh/...`
-  (**warning: compile time can stretch into hours**)
+- Arrays: `gdtq_twopass.cuh` evaluates a function over a device array with
+  the two-pass / partitioned schedules (bitwise identical results; faster
+  for sin/cos/tan with some huge arguments and for sinh/cosh/tanh/expm1/
+  asinh/acosh on GPUs with weak FP64)
+- `ALL_MATH` (`gqd_type.h`) matters only for builds with
+  `-DGDTQ_LEGACY_ELEMENTARY` (`configure --enable-legacy-elementary`),
+  where it selects the 0.0.3 asin/acos/atan/sinh/... as in 0.0.3
+  (**compile time can stretch into hours**)
 
 ### 6.1b Branch-free fused multiply-add (new in 0.0.3)
 
@@ -355,7 +364,7 @@ plain C linker fails to resolve `libstdc++` symbols such as
 | exp/log lose ~10¹² eps when comparing CPU vs GPU | The CPU-side QD/dd_real was built with FMA contraction. Rebuild it with `-ffp-contract=off` (see the matching dtq note) |
 | Host link error from QD | `fpu_fix_start/end` not called, or `-lqd` missing |
 | Undefined symbols at link with the C linker | Switch to `g++` / `nvcc` for linking; with Automake add `nodist_EXTRA_xxx_SOURCES = dummy.cxx` |
-| sin/cos/tan extremely slow / compile that never finishes | `ALL_MATH` is enabled in `gqd_type.h`; turn it off if you don't need the extra functions |
+| sin/cos/tan extremely slow / compile that never finishes | A legacy build (`-DGDTQ_LEGACY_ELEMENTARY`) with `ALL_MATH` enabled in `gqd_type.h`; the default 0.0.4 build does not need `ALL_MATH` |
 
 ---
 

@@ -26,7 +26,9 @@ void sincos(const gqs_real &a, gqs_real &sin_a, gqs_real &cos_a);
 __device__
 gqs_real tan(const gqs_real &a);
 
-#ifdef ALL_MATH	
+/* always available (gdtq 0.0.4: mw kernels, see gqs_elem.cu).  A
+   GDTQ_LEGACY_ELEMENTARY build uses the 0.0.3 versions of these when
+   0.0.3 compiled them, i.e. with ALL_MATH (gqd_type.h). */
 
 __device__
 gqs_real atan2(const gqs_real &y, const gqs_real &x);
@@ -61,7 +63,6 @@ gqs_real acosh(const gqs_real &a);
 __device__
 gqs_real atanh(const gqs_real &a);
 
-#endif /* ALL_MATH */
 
 
 #endif /* __GQS_SIN_COS_CUH__ */

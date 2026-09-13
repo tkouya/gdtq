@@ -332,6 +332,42 @@ never materialized.
 
 
 -----------------------------------------------------------------------
+Elementary functions (0.0.4, in preparation: branch elementary-core)
+-----------------------------------------------------------------------
+The elementary functions of all six classes are now the table-driven
+multi-word kernels of the CORE-dtq project (inc/mw/, wrapped by
+inc/gqd_elem.cu and inc/gqs_elem.cu):
+
+    exp expm1 log log10 log1p sin cos tan sincos asin acos atan atan2
+    sinh cosh tanh sincosh asinh acosh atanh pow(a, b)
+
+for gdd/gtd/gqd (double words) and gds/gts/gqs (float words).  New for
+some or all classes: log1p and pow (all), atan2 ... atanh for gtd/gts
+and, without ALL_MATH, for gqd/gqs.
+
+  * Argument reduction: two-level tables ((K+1)-word entries), strong
+    Cody-Waite reduction with exact k*C_i terms, Payne-Hanek for huge
+    sin/cos/tan arguments; mixed-width Horner schemes whose per-stage
+    word counts come from an error budget; accurate reconstruction.
+  * Accuracy against MPFR (GB10, evaluation domains): max. 4.3 u^2 (DD),
+    8.3 u^3 (TD), 11.6 u^4 (QD), 4.4 / 7.7 / 13.7 u^K (DS/TS/QS), where
+    0.0.3 reached 10^6-10^13 u^K (sin/cos reduction, log near 1).
+    -DMW_CASCADE_GUARD adds a guard word to the accumulators (<= 5.6 u^K,
+    1.4-2.3x slower).
+  * Speed-up over 0.0.3 (geometric means over the functions 0.0.3 has):
+    DD 2.7x, TD 4.0x, QD 4.8x, DS 2.5x, TS 10.7x, QS 9.8x.
+  * inc/gdtq_twopass.cuh: array evaluation with the two-pass /
+    partitioned schedules (bitwise identical results).
+  * sqrt is unchanged (the fused multiply-add Newton iteration of 0.0.3).
+  * `configure --enable-legacy-elementary` (-DGDTQ_LEGACY_ELEMENTARY)
+    keeps the 0.0.3 implementations of the functions 0.0.3 provided;
+    the new ones then still use the kernels.
+  * test/elembench covers all functions; test/fmaref checks dw/tw/qw_fma
+    and the div/sqrt-safe variants bitwise against the machine-proved
+    reference (DW 17 / TW 72 / QW 176 flops, safe 20 / 84 / 206).
+
+
+-----------------------------------------------------------------------
 Using the library from C
 -----------------------------------------------------------------------
 The gdtq API is built around C++ operator overloads and templates and
@@ -369,16 +405,19 @@ Programs in test/
                   against an exact expansion-arithmetic reference
   * fmabench    - old (0.0.2) vs new (0.0.3) timings for the same
   * elembench   - GPU counterpart of the dtq-0.0.3 elem_bench: accuracy
-                  of sqrt/exp/expm1/log/log10/sin/cos and polyeval
-                  against MPFR references, special-value handling, and
-                  per-call timings (needs MPFR/GMP on the host)
+                  of sqrt and of all elementary functions (exp ... pow)
+                  and polyeval against MPFR references, special-value
+                  handling, and per-call timings (needs MPFR/GMP)
+  * fmaref      - bitwise conformance of dw/tw/qw_fma and the
+                  div/sqrt-safe variants with the machine-proved
+                  reference formulation (host transcription of fma_ref.c)
 
 Run after `make`:
 
     cd test
     ./benchmark
     ./sqstest
-    make fmacheck      # or ./fmatest
+    make fmacheck      # ./fmatest and ./fmaref
     make bench         # or ./fmabench
     ./elembench        # elementary functions vs MPFR + timings
 
@@ -394,8 +433,11 @@ A short summary; see section 8 of the quick reference for more.
   * Build the CPU-side QD / dd_real with `-ffp-contract=off`; otherwise
     FMA fusion silently breaks Two-Sum / Two-Prod and your CPU gold
     reference loses ~12 digits.
-  * Defining `ALL_MATH` in `gqd_type.h` enables asin/acos/atan/sinh/...
-    but compile time can stretch into hours. Leave it off unless needed.
+  * `ALL_MATH` in `gqd_type.h` only matters for a legacy build
+    (`--enable-legacy-elementary`), where it enables the 0.0.3
+    asin/acos/atan/sinh/... of gqd/gqs (and disables those of gdd/gds)
+    as in 0.0.3; compile time can then stretch into hours.  The default
+    0.0.4 build provides all functions for all classes without it.
   * Effective range of the float-based types: a gds/gts/gqs value
     carries its full precision only while its *lowest* limb stays
     inside the normal range of IEEE-754 single precision (>= 2^-126).

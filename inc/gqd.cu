@@ -31,6 +31,9 @@
 #include "gqd_log.cu"
 #include "gqd_sincos.cu"
 
+/* elementary functions of the three classes (gdtq 0.0.4: mw kernels) */
+#include "gqd_elem.cu"
+
 #endif // __GQD_CU__
 
 

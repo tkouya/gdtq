@@ -8,6 +8,8 @@
 
 #include "gqs.cuh"
 
+#if defined(GDTQ_LEGACY_ELEMENTARY)  /* 0.0.3 implementation; default: mw kernels in gqs_elem.cu */
+
 /* log(a) by Newton's method on f(x) = exp(x) - a:
  *   x_{n+1} = x_n + a * exp(-x_n) - 1
  * Newton doubles the number of correct digits per iteration, so start
@@ -37,5 +39,7 @@ gts_real log10(const gts_real &a)
 {
 	return log(a) / _ts_log10;
 }
+
+#endif /* GDTQ_LEGACY_ELEMENTARY */
 
 #endif /* __GTS_LOG_CU__ */

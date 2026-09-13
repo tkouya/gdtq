@@ -58,9 +58,19 @@ gdtqinclude_DATA = \
 	gqs_sqrt.cu      gqs_sqrt.cuh \
 	gqs_exp.cu       gqs_exp.cuh \
 	gqs_log.cu       gqs_log.cuh \
-	gqs_sincos.cu    gqs_sincos.cuh
+	gqs_sincos.cu    gqs_sincos.cuh \
+	gqd_elem.cu      gqs_elem.cu \
+	gdtq_mw.cuh      gdtq_twopass.cuh
 
-EXTRA_DIST = $(gdtqinclude_DATA) convert_to_float.py
+## Generic multi-word elementary-function kernels (gdtq 0.0.4), included
+## by gqd_elem.cu / gqs_elem.cu through gdtq_mw.cuh.
+gdtqmwincludedir = $(includedir)/gdtq/mw
+
+gdtqmwinclude_DATA = \
+	mw/mw_arith.h    mw/mw_elem.h \
+	mw/mw_tables.h   mw/mw_twopass.cuh
+
+EXTRA_DIST = $(gdtqinclude_DATA) $(gdtqmwinclude_DATA) convert_to_float.py
 
 ## ====================================================================
 ## Consolidated library: libgqd.a (static) and libgqd.so (shared)
@@ -88,7 +98,7 @@ LIBGQD    = libgqd.a
 LIBGQD_SO = libgqd.so
 
 ## Every installed .cu/.cuh plus gqd_type.h triggers a rebuild.
-LIBGQD_SRCDEPS = $(gdtqinclude_DATA) $(gdtqinclude_HEADERS)
+LIBGQD_SRCDEPS = $(gdtqinclude_DATA) $(gdtqmwinclude_DATA) $(gdtqinclude_HEADERS)
 
 NVCC = @NVCC@
 LIBGQD_NVCCFLAGS = @NVCC_FLAGS@ -arch=@CUDA_ARCH@ -rdc=true \

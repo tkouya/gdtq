@@ -9,4 +9,9 @@ gts_real exp(const gts_real &a);
 __device__
 gts_real expm1(const gts_real &a);
 
+/* a^b = exp(b log a) for a > 0, with a (K+1)-word log and product
+   (new in gdtq 0.0.4). */
+__device__
+gts_real pow(const gts_real &a, const gts_real &b);
+
 #endif /* __GTS_EXP_CUH__ */

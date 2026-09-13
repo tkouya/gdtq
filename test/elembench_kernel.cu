@@ -7,7 +7,9 @@
  *   [1] Exception / special-value handling checks (exp / log / sqrt)
  *   [2] Accuracy of sqrt / exp / expm1 / log / log10 / sin / cos and
  *       polyeval for all six precision classes, measured against MPFR
- *       references computed on the host
+ *       references computed on the host; since 0.0.4 also log1p, tan,
+ *       asin, acos, atan, sinh, cosh, tanh, asinh, acosh, atanh, atan2
+ *       and pow
  *   [3] Performance (ns per call over 2^20 elements, best of 5 runs),
  *       with a native double baseline
  *
@@ -42,17 +44,29 @@ static int n_fail = 0;
 
 /* function selector, uniform per kernel launch (no divergence) */
 enum ElemOp { OP_SQRT, OP_EXP, OP_EXPM1, OP_LOG, OP_LOG10,
-              OP_SIN, OP_COS, OP_N };
+              OP_SIN, OP_COS,
+              /* gdtq 0.0.4 */
+              OP_LOG1P, OP_TAN, OP_ASIN, OP_ACOS, OP_ATAN, OP_SINH,
+              OP_COSH, OP_TANH, OP_ASINH, OP_ACOSH, OP_ATANH,
+              OP_ATAN2, OP_POW,          /* binary: z = f(a, b) */
+              OP_N };
+#define OP_FIRST_BINARY OP_ATAN2
 
 static const char *op_name[OP_N] =
-  { "sqrt", "exp", "expm1", "log", "log10", "sin", "cos" };
+  { "sqrt", "exp", "expm1", "log", "log10", "sin", "cos",
+    "log1p", "tan", "asin", "acos", "atan", "sinh", "cosh", "tanh",
+    "asinh", "acosh", "atanh", "atan2", "pow" };
 
 typedef int (*mpfr_fun1)(mpfr_ptr, mpfr_srcptr, mpfr_rnd_t);
 static const mpfr_fun1 op_mpfr[OP_N] =
   { mpfr_sqrt, mpfr_exp, mpfr_expm1, mpfr_log, mpfr_log10,
-    mpfr_sin, mpfr_cos };
+    mpfr_sin, mpfr_cos,
+    mpfr_log1p, mpfr_tan, mpfr_asin, mpfr_acos, mpfr_atan, mpfr_sinh,
+    mpfr_cosh, mpfr_tanh, mpfr_asinh, mpfr_acosh, mpfr_atanh,
+    NULL, NULL };
 
-/* sampling range per op: {lo, hi, logscale} */
+/* sampling range per op: {lo, hi, logscale}; for the binary ops the
+   first argument (atan2: y, pow: base) */
 static const struct { double lo, hi; int logscale; } op_range[OP_N] = {
 	{ 1e-3, 1e3, 1 },    /* sqrt  */
 	{ -20.0, 20.0, 0 },  /* exp   */
@@ -61,14 +75,34 @@ static const struct { double lo, hi; int logscale; } op_range[OP_N] = {
 	{ 1e-6, 1e6, 1 },    /* log10 */
 	{ -6.28, 6.28, 0 },  /* sin   */
 	{ -6.28, 6.28, 0 },  /* cos   */
+	{ -0.5, 1.0, 0 },    /* log1p */
+	{ -1.57, 1.57, 0 },  /* tan   */
+	{ -1.0, 1.0, 0 },    /* asin  */
+	{ -1.0, 1.0, 0 },    /* acos  */
+	{ -100.0, 100.0, 0 },/* atan  */
+	{ -10.0, 10.0, 0 },  /* sinh  */
+	{ -10.0, 10.0, 0 },  /* cosh  */
+	{ -10.0, 10.0, 0 },  /* tanh  */
+	{ -10.0, 10.0, 0 },  /* asinh */
+	{ 1.0, 100.0, 1 },   /* acosh */
+	{ -0.9, 0.9, 0 },    /* atanh */
+	{ -10.0, 10.0, 0 },  /* atan2 (y) */
+	{ 0.1, 10.0, 1 },    /* pow (base) */
 };
+/* second argument of the binary ops: atan2 x in [-10,10], pow exponent
+   in [-8,8] */
+static const struct { double lo, hi; } op_range2[OP_N - OP_FIRST_BINARY] = {
+	{ -10.0, 10.0 }, { -8.0, 8.0 } };
 
 /*==================================================================
  * Device kernels
  *==================================================================*/
 
-template <class T>
-__global__ void k_elem(const T *a, T *z, int n, int op) {
+/* one kernel per function (the op is a template argument), so that the
+   timing of a cheap function is not affected by the register allocation of
+   an expensive one */
+template <class T, int op>
+__global__ void k_elem1(const T *a, const T *b, T *z, int n) {
 	int i = blockIdx.x * blockDim.x + threadIdx.x;
 	if (i >= n) return;
 	switch (op) {
@@ -79,7 +113,33 @@ __global__ void k_elem(const T *a, T *z, int n, int op) {
 	case OP_LOG10: z[i] = log10(a[i]); break;
 	case OP_SIN:   z[i] = sin(a[i]);   break;
 	case OP_COS:   z[i] = cos(a[i]);   break;
+	case OP_LOG1P: z[i] = log1p(a[i]); break;
+	case OP_TAN:   z[i] = tan(a[i]);   break;
+	case OP_ASIN:  z[i] = asin(a[i]);  break;
+	case OP_ACOS:  z[i] = acos(a[i]);  break;
+	case OP_ATAN:  z[i] = atan(a[i]);  break;
+	case OP_SINH:  z[i] = sinh(a[i]);  break;
+	case OP_COSH:  z[i] = cosh(a[i]);  break;
+	case OP_TANH:  z[i] = tanh(a[i]);  break;
+	case OP_ASINH: z[i] = asinh(a[i]); break;
+	case OP_ACOSH: z[i] = acosh(a[i]); break;
+	case OP_ATANH: z[i] = atanh(a[i]); break;
+	case OP_ATAN2: z[i] = atan2(a[i], b[i]); break;
+	case OP_POW:   z[i] = pow(a[i], b[i]);   break;
 	}
+}
+
+template <class T>
+static void k_elem(int grid, int block, const T *a, const T *b, T *z, int n, int op) {
+#define ELEM_CASE(OP) case OP: k_elem1<T, OP><<<grid, block>>>(a, b, z, n); break;
+	switch (op) {
+	ELEM_CASE(OP_SQRT)  ELEM_CASE(OP_EXP)   ELEM_CASE(OP_EXPM1) ELEM_CASE(OP_LOG)
+	ELEM_CASE(OP_LOG10) ELEM_CASE(OP_SIN)   ELEM_CASE(OP_COS)   ELEM_CASE(OP_LOG1P)
+	ELEM_CASE(OP_TAN)   ELEM_CASE(OP_ASIN)  ELEM_CASE(OP_ACOS)  ELEM_CASE(OP_ATAN)
+	ELEM_CASE(OP_SINH)  ELEM_CASE(OP_COSH)  ELEM_CASE(OP_TANH)  ELEM_CASE(OP_ASINH)
+	ELEM_CASE(OP_ACOSH) ELEM_CASE(OP_ATANH) ELEM_CASE(OP_ATAN2) ELEM_CASE(OP_POW)
+	}
+#undef ELEM_CASE
 }
 
 template <class T>
@@ -89,7 +149,7 @@ __global__ void k_poly(const T *c, const T *x, T *z, int n) {
 }
 
 /* native double baseline */
-__global__ void k_elem_double(const double *a, double *z, int n, int op) {
+__global__ void k_elem_double(const double *a, const double *b, double *z, int n, int op) {
 	int i = blockIdx.x * blockDim.x + threadIdx.x;
 	if (i >= n) return;
 	switch (op) {
@@ -100,6 +160,19 @@ __global__ void k_elem_double(const double *a, double *z, int n, int op) {
 	case OP_LOG10: z[i] = log10(a[i]); break;
 	case OP_SIN:   z[i] = sin(a[i]);   break;
 	case OP_COS:   z[i] = cos(a[i]);   break;
+	case OP_LOG1P: z[i] = log1p(a[i]); break;
+	case OP_TAN:   z[i] = tan(a[i]);   break;
+	case OP_ASIN:  z[i] = asin(a[i]);  break;
+	case OP_ACOS:  z[i] = acos(a[i]);  break;
+	case OP_ATAN:  z[i] = atan(a[i]);  break;
+	case OP_SINH:  z[i] = sinh(a[i]);  break;
+	case OP_COSH:  z[i] = cosh(a[i]);  break;
+	case OP_TANH:  z[i] = tanh(a[i]);  break;
+	case OP_ASINH: z[i] = asinh(a[i]); break;
+	case OP_ACOSH: z[i] = acosh(a[i]); break;
+	case OP_ATANH: z[i] = atanh(a[i]); break;
+	case OP_ATAN2: z[i] = atan2(a[i], b[i]); break;
+	case OP_POW:   z[i] = pow(a[i], b[i]);   break;
 	}
 }
 
@@ -154,6 +227,11 @@ static double base_input(int op) {
 	return lo + (hi - lo) * urand01();
 }
 
+static double second_input(int op) {
+	const int k = op - OP_FIRST_BINARY;
+	return op_range2[k].lo + (op_range2[k].hi - op_range2[k].lo) * urand01();
+}
+
 /* populate lower limbs with noise so the input uses full precision */
 static void fill1(gdd_real &v, double a) {
 	v = make_dd(a, a * ldexp(urand01() - 0.5, -53)); }
@@ -177,6 +255,13 @@ static void fill1(gqs_real &v, double a) { float h = (float)a;
 template <class T>
 static void fill(T *v, int n, int op) {
 	for (int i = 0; i < n; i++) fill1(v[i], base_input(op));
+}
+
+/* second argument of the binary ops (unused, but filled, otherwise) */
+template <class T>
+static void fill2(T *v, int n, int op) {
+	for (int i = 0; i < n; i++)
+		fill1(v[i], op >= OP_FIRST_BINARY ? second_input(op) : 1.0);
 }
 
 /* leading-limb-only values (polyeval coefficients / inputs) */
@@ -225,9 +310,9 @@ static void special_tests(void) {
 	GPUMALLOC((void **)&d_out, 6 * sizeof(T));
 	TOGPU(d_in, hin, 6 * sizeof(T));
 
-	k_elem<T><<<1, 32>>>(d_in,     d_out,     3, OP_EXP);
-	k_elem<T><<<1, 32>>>(d_in + 3, d_out + 3, 2, OP_LOG);
-	k_elem<T><<<1, 32>>>(d_in + 5, d_out + 5, 1, OP_SQRT);
+	k_elem<T>(1, 32, d_in,     d_in,     d_out,     3, OP_EXP);
+	k_elem<T>(1, 32, d_in + 3, d_in + 3, d_out + 3, 2, OP_LOG);
+	k_elem<T>(1, 32, d_in + 5, d_in + 5, d_out + 5, 1, OP_SQRT);
 	cudaDeviceSynchronize(); cutilCheckMsg("special");
 	FROMGPU(hout, d_out, 6 * sizeof(T));
 
@@ -274,13 +359,14 @@ static void test_type(void) {
 	const double bits_cap = pb + 24.0;
 	const size_t sz_time = N_TIME * sizeof(T);
 
-	T *ha = (T *)malloc(sz_time), *hz = (T *)malloc(sz_time);
-	T *da, *dz;
+	T *ha = (T *)malloc(sz_time), *hb = (T *)malloc(sz_time), *hz = (T *)malloc(sz_time);
+	T *da, *db, *dz;
 	GPUMALLOC((void **)&da, sz_time);
+	GPUMALLOC((void **)&db, sz_time);
 	GPUMALLOC((void **)&dz, sz_time);
 
-	mpfr_t mx, mref, mcomp, mtmp;
-	mpfr_inits2(wp, mx, mref, mcomp, mtmp, (mpfr_ptr) 0);
+	mpfr_t mx, my, mref, mcomp, mtmp;
+	mpfr_inits2(wp, mx, my, mref, mcomp, mtmp, (mpfr_ptr) 0);
 
 	printf("--- %s (theoretical %d bits, N=%d) ---\n", RT<T>::name, pb, n_acc);
 	printf("  %-8s %12s %12s %10s %13s %5s %10s\n",
@@ -290,9 +376,11 @@ static void test_type(void) {
 	for (int op = 0; op < OP_N; op++) {
 		/* ---- accuracy vs MPFR ---- */
 		fill(ha, n_acc, op);
+		fill2(hb, n_acc, op);
 		TOGPU(da, ha, n_acc * sizeof(T));
+		TOGPU(db, hb, n_acc * sizeof(T));
 		int grid = (n_acc + BLOCK - 1) / BLOCK;
-		k_elem<T><<<grid, BLOCK>>>(da, dz, n_acc, op);
+		k_elem<T>(grid, BLOCK, da, db, dz, n_acc, op);
 		cudaDeviceSynchronize(); cutilCheckMsg("k_elem");
 		FROMGPU(hz, dz, n_acc * sizeof(T));
 
@@ -303,7 +391,14 @@ static void test_type(void) {
 			if (isnan(wl) || isinf(wl)) { anom++; continue; }
 
 			to_mpfr(mx, ha[i]);
-			op_mpfr[op](mref, mx, MPFR_RNDN);
+			if (op == OP_ATAN2) {
+				to_mpfr(my, hb[i]);
+				mpfr_atan2(mref, mx, my, MPFR_RNDN);
+			} else if (op == OP_POW) {
+				to_mpfr(my, hb[i]);
+				mpfr_pow(mref, mx, my, MPFR_RNDN);
+			} else
+				op_mpfr[op](mref, mx, MPFR_RNDN);
 			to_mpfr(mcomp, hz[i]);
 			mpfr_sub(mtmp, mcomp, mref, MPFR_RNDN);
 			double relerr;
@@ -324,10 +419,12 @@ static void test_type(void) {
 
 		/* ---- timing ---- */
 		fill(ha, N_TIME, op);
+		fill2(hb, N_TIME, op);
 		TOGPU(da, ha, sz_time);
+		TOGPU(db, hb, sz_time);
 		int tgrid = (N_TIME + BLOCK - 1) / BLOCK;
 		float ms = time_best_ms([&]() {
-			k_elem<T><<<tgrid, BLOCK>>>(da, dz, N_TIME, op); });
+			k_elem<T>(tgrid, BLOCK, da, db, dz, N_TIME, op); });
 
 		printf("  %-8s %12.3g %12.3g %10.1f %13.6g %5d %10.2f\n",
 		       op_name[op], max_ulp, avg_ulp, min_bits, worst_x, anom,
@@ -391,9 +488,9 @@ static void test_type(void) {
 	}
 	printf("\n");
 
-	mpfr_clears(mx, mref, mcomp, mtmp, (mpfr_ptr) 0);
-	GPUFREE(da); GPUFREE(dz);
-	free(ha); free(hz);
+	mpfr_clears(mx, my, mref, mcomp, mtmp, (mpfr_ptr) 0);
+	GPUFREE(da); GPUFREE(db); GPUFREE(dz);
+	free(ha); free(hb); free(hz);
 }
 
 /*==================================================================
@@ -429,21 +526,27 @@ int main(int argc, char **argv) {
 	/* native double baseline (timing only) */
 	{
 		double *ha = (double *)malloc(N_TIME * sizeof(double));
-		double *da, *dz;
+		double *hb = (double *)malloc(N_TIME * sizeof(double));
+		double *da, *db, *dz;
 		GPUMALLOC((void **)&da, N_TIME * sizeof(double));
+		GPUMALLOC((void **)&db, N_TIME * sizeof(double));
 		GPUMALLOC((void **)&dz, N_TIME * sizeof(double));
 		printf("--- double (baseline, timing only) ---\n");
 		printf("  %-8s %10s\n", "func", "ns/call");
 		int grid = (N_TIME + BLOCK - 1) / BLOCK;
 		for (int op = 0; op < OP_N; op++) {
-			for (int i = 0; i < N_TIME; i++) ha[i] = base_input(op);
+			for (int i = 0; i < N_TIME; i++) {
+				ha[i] = base_input(op);
+				hb[i] = op >= OP_FIRST_BINARY ? second_input(op) : 1.0;
+			}
 			TOGPU(da, ha, N_TIME * sizeof(double));
+			TOGPU(db, hb, N_TIME * sizeof(double));
 			float ms = time_best_ms([&]() {
-				k_elem_double<<<grid, BLOCK>>>(da, dz, N_TIME, op); });
+				k_elem_double<<<grid, BLOCK>>>(da, db, dz, N_TIME, op); });
 			printf("  %-8s %10.2f\n", op_name[op], ms * 1e6 / N_TIME);
 		}
 		printf("\n");
-		GPUFREE(da); GPUFREE(dz); free(ha);
+		GPUFREE(da); GPUFREE(db); GPUFREE(dz); free(ha); free(hb);
 	}
 
 	printf("double-based classes\n");

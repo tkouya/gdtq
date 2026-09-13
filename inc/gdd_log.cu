@@ -5,6 +5,8 @@
 
 #include "gqd.cuh"
 
+#if defined(GDTQ_LEGACY_ELEMENTARY)  /* 0.0.3 implementation; default: mw kernels in gqd_elem.cu */
+
 /* Logarithm.  Computes log(x) in double-double precision.
    This is a natural logarithm (i.e., base e).
 
@@ -48,5 +50,7 @@ gdd_real log10(const gdd_real &a)
 {
 	return log(a) / _dd_log10;
 }
+
+#endif /* GDTQ_LEGACY_ELEMENTARY */
 
 #endif /* __GDD_LOG_CU__ */

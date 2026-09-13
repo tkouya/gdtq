@@ -527,7 +527,9 @@ gqd_real sqr(const gqd_real &a)
 // its own.
 /* QW-FMA  z = a * b + c   (176 flops)
    Machine-proved with FPANVerifier + z3 5.0.0 (ACS2026 formulation):
-     error bound      |z-(ab+c)| <= 812 u^4 (|ab|+|c|)
+     error bound      |z-(ab+c)| <= 822 u^4 (|ab|+|c|)
+                      (FPANVerifier anchor-relative 812 u^4 plus the
+                       analytic input-relative conversion)
      every FastTwoSum precondition  exp(x) >= exp(y)
      non-overlapping output         z0 |> z1 |> z2 |> z3   (strongly_dominates)
    Normalization repeats a cascade over adjacent pairs; the pass count is the
@@ -604,7 +606,9 @@ gqd_real qw_fma(const gqd_real &a, const gqd_real &b, const gqd_real &c)
 
 /* QW-FMA  z = a * b + c   (176 flops, scalar multiplier)
    Machine-proved with FPANVerifier + z3 5.0.0 (ACS2026 formulation):
-     error bound      |z-(ab+c)| <= 812 u^4 (|ab|+|c|)
+     error bound      |z-(ab+c)| <= 822 u^4 (|ab|+|c|)
+                      (FPANVerifier anchor-relative 812 u^4 plus the
+                       analytic input-relative conversion)
      every FastTwoSum precondition  exp(x) >= exp(y)
      non-overlapping output         z0 |> z1 |> z2 |> z3   (strongly_dominates)
    Normalization repeats a cascade over adjacent pairs; the pass count is the

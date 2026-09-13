@@ -110,6 +110,8 @@ gqs_real cos_taylor(const gqs_real &a) {
 }
 
 
+#if defined(GDTQ_LEGACY_ELEMENTARY)  /* 0.0.3 implementation; default: mw kernels in gqs_elem.cu */
+
 __device__
 gqs_real sin(const gqs_real &a) {
 
@@ -414,7 +416,10 @@ gqs_real tan(const gqs_real &a) {
   return s/c;
 }
 
-#ifdef ALL_MATH	
+#endif /* GDTQ_LEGACY_ELEMENTARY */
+
+/* 0.0.3 advanced functions (ALL_MATH keeps its 0.0.3 meaning in legacy builds) */
+#if defined(GDTQ_LEGACY_ELEMENTARY) && defined(ALL_MATH)
 
 __device__
 gqs_real atan2(const gqs_real &y, const gqs_real &x) {
@@ -613,7 +618,7 @@ gqs_real atanh(const gqs_real &a) {
 }
 
 
-#endif /* ALL_MATH */
+#endif /* GDTQ_LEGACY_ELEMENTARY && ALL_MATH */
 
 /* (The matching `#endif // USE_GQD_SIN` was removed together with the
    opening `#ifdef USE_GQD_SIN` at the top of the file.) */

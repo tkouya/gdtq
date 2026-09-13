@@ -91,6 +91,8 @@ gts_real cos_taylor(const gts_real &a)
 	return s;
 }
 
+#if defined(GDTQ_LEGACY_ELEMENTARY)  /* 0.0.3 implementation; default: mw kernels in gqs_elem.cu */
+
 __device__
 gts_real sin(const gts_real &a)
 {
@@ -249,5 +251,7 @@ gts_real tan(const gts_real &a)
 	sincos(a, s, c);
 	return s / c;
 }
+
+#endif /* GDTQ_LEGACY_ELEMENTARY */
 
 #endif /* __GTS_SIN_COS_CU__ */

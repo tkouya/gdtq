@@ -8,6 +8,8 @@
 
 #include "gqd.cuh"
 
+#if defined(GDTQ_LEGACY_ELEMENTARY)  /* 0.0.3 implementation; default: mw kernels in gqd_elem.cu */
+
 __device__
 gqd_real exp( const gqd_real &a ) {
         /* Two-level table-driven reduction (same idea as the sin/cos tables):
@@ -113,5 +115,7 @@ gqd_real expm1( const gqd_real &a ) {
         return s;      /* = exp(a) - 1, no +1 */
 }
 
+
+#endif /* GDTQ_LEGACY_ELEMENTARY */
 
 #endif /* __GQD_EXP_CU__ */

@@ -215,7 +215,9 @@ gdd_real operator*(double a, const gdd_real &b)
 // its own, so this is cheaper than -- and no less accurate than -- a*b+c.
 /* DW-FMA  z = a * b + c   (17 flops)
    Machine-proved with FPANVerifier + z3 5.0.0 (ACS2026 formulation):
-     error bound      |z-(ab+c)| <= 34 u^2 (|ab|+|c|)
+     error bound      |z-(ab+c)| <= 35 u^2 (|ab|+|c|)
+                      (FPANVerifier anchor-relative 34 u^2 plus the
+                       analytic input-relative conversion)
      every FastTwoSum precondition  exp(x) >= exp(y)
      non-overlapping output         z0 |> z1   (strongly_dominates)
    Normalization repeats a cascade over adjacent pairs; the pass count is the
@@ -239,7 +241,9 @@ gdd_real dw_fma(const gdd_real &a, const gdd_real &b, const gdd_real &c)
 
 /* DW-FMA  z = a * b + c   (17 flops, scalar multiplier)
    Machine-proved with FPANVerifier + z3 5.0.0 (ACS2026 formulation):
-     error bound      |z-(ab+c)| <= 34 u^2 (|ab|+|c|)
+     error bound      |z-(ab+c)| <= 35 u^2 (|ab|+|c|)
+                      (FPANVerifier anchor-relative 34 u^2 plus the
+                       analytic input-relative conversion)
      every FastTwoSum precondition  exp(x) >= exp(y)
      non-overlapping output         z0 |> z1   (strongly_dominates)
    Normalization repeats a cascade over adjacent pairs; the pass count is the

@@ -5,6 +5,8 @@
 
 #include "gqs.cuh"
 
+#if defined(GDTQ_LEGACY_ELEMENTARY)  /* 0.0.3 implementation; default: mw kernels in gqs_elem.cu */
+
 /* Logarithm.  Computes log(x) in float-float precision.
    This is a natural logarithm (i.e., base e).
 
@@ -39,5 +41,7 @@ gds_real log10(const gds_real &a)
 {
 	return log(a) / _ds_log10;
 }
+
+#endif /* GDTQ_LEGACY_ELEMENTARY */
 
 #endif /* __GDS_LOG_CU__ */

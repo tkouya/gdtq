@@ -8,6 +8,8 @@
 
 #include "gqd.cuh"
 
+#if defined(GDTQ_LEGACY_ELEMENTARY)  /* 0.0.3 implementation; default: mw kernels in gqd_elem.cu */
+
 #define INV_K (1.0/512.0)
 
 /* Strategy:  We first reduce the size of x by noting that
@@ -108,5 +110,7 @@ gdd_real expm1(const gdd_real &a) {
         return s;      /* = exp(a) - 1, no +1 */
 }
 
+
+#endif /* GDTQ_LEGACY_ELEMENTARY */
 
 #endif /* __GDD_EXP_CU__ */

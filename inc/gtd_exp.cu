@@ -8,6 +8,8 @@
 
 #include "gqd.cuh"
 
+#if defined(GDTQ_LEGACY_ELEMENTARY)  /* 0.0.3 implementation; default: mw kernels in gqd_elem.cu */
+
 /* Same two-level table-driven reduction as the gqd_real version,
 
        a = m log 2 + j1/64 + j2/8192 + r,   |r| <= 2^-14 + eps,
@@ -93,5 +95,7 @@ gtd_real expm1(const gtd_real &a)
 
 	return s;      /* = exp(a) - 1, no +1 */
 }
+
+#endif /* GDTQ_LEGACY_ELEMENTARY */
 
 #endif /* __GTD_EXP_CU__ */

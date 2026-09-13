@@ -34,4 +34,7 @@
 #include "gqs_log.cu"
 #include "gqs_sincos.cu"
 
+/* elementary functions of the three classes (gdtq 0.0.4: mw kernels) */
+#include "gqs_elem.cu"
+
 #endif /* __GQS_CU__ */

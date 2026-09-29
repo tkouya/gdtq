@@ -5,7 +5,7 @@ A short reference for using `gdtq`, a header-only collection that provides
 **double-single / triple-single / quadruple-single** (DS/TS/QS) multi-precision
 arithmetic on CUDA, from your own project.
 
-Target version: **gdtq-0.0.3** (derived from QD 2.3 / GQD, with `gtd_real` added)
+Target version: **gdtq-0.0.4** (derived from QD 2.3 / GQD, with `gtd_real` added)
 
 ---
 

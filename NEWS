@@ -1,4 +1,4 @@
-Changes for gdtq 0.0.4 (in preparation, branch elementary-core)
+Changes for gdtq 0.0.4
   - New elementary functions for all six classes: the table-driven
     multi-word kernels of the CORE-dtq project (inc/mw/, wrapped by
     inc/gqd_elem.cu and inc/gqs_elem.cu through inc/gdtq_mw.cuh), the GPU

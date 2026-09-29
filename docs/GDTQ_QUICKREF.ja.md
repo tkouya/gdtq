@@ -4,7 +4,7 @@ CUDA 上で **double-double / triple-double / quadruple-double** （DD/TD/QD）�
 **double-single / triple-single / quadruple-single**（DS/TS/QS）の多倍長精度演算を
 提供するヘッダ群 `gdtq` を、自分のプロジェクトから利用するときの簡易リファレンスです。
 
-対象バージョン: **gdtq-0.0.3**（QD 2.3 / GQD 由来、`gtd_real` を追加）
+対象バージョン: **gdtq-0.0.4**（QD 2.3 / GQD 由来、`gtd_real` を追加）
 
 ---
 

@@ -1,5 +1,5 @@
 ================================================
-GDTQ Version 0.0.3
+GDTQ Version 0.0.4
 Copyright (C) 2026 Tomonori Kouya
 based on the GQD library (Mian Lu) and QD library (Yozo Hida, Xiaoye S. Li,
 David H. Bailey; LBNL)
@@ -332,7 +332,7 @@ never materialized.
 
 
 -----------------------------------------------------------------------
-Elementary functions (0.0.4, in preparation: branch elementary-core)
+Elementary functions (new in 0.0.4)
 -----------------------------------------------------------------------
 The elementary functions of all six classes are now the table-driven
 multi-word kernels of the CORE-dtq project (inc/mw/, wrapped by

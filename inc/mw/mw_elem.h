@@ -590,7 +590,8 @@ MWF mwn<T, S::K> sinh(const mwn<T, S::K> &a) {
     hy_small<S>(x, s, c, true, false);
     return neg_if(s, ng);
   }
-  const T big = (sizeof(T) == 8) ? T(40) : T(20);
+  /* e^{-2x} < u^K: K*p*ln2/2 (p=53: 18.4K, p=24: 8.3K) */
+  const T big = (sizeof(T) == 8) ? T(20) * K : T(10) * K;
   if (x.v[0] > big) {
     if (x.v[0] > Lim<T>::EXP_OVF + T(0.7)) return mwinf<K, T>(ng);
     int m;
@@ -611,7 +612,8 @@ MWF mwn<T, S::K> cosh(const mwn<T, S::K> &a) {
     hy_small<S>(x, s, c, false, true);
     return c;
   }
-  const T big = (sizeof(T) == 8) ? T(40) : T(20);
+  /* e^{-2x} < u^K: K*p*ln2/2 (p=53: 18.4K, p=24: 8.3K) */
+  const T big = (sizeof(T) == 8) ? T(20) * K : T(10) * K;
   if (x.v[0] > big) {
     if (x.v[0] > Lim<T>::EXP_OVF + T(0.7)) return mwinf<K, T>();
     int m;

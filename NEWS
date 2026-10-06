@@ -1,3 +1,15 @@
+Changes since gdtq 0.0.4 (bug fixes)
+  - sinh/cosh of gtd_real, gqd_real, gts_real and gqs_real
+    (inc/mw/mw_elem.h): same fix as in dtq.  The large-argument thresholds
+    40 / 20 were correct only for the two-word types; they are now 20 K
+    (double words) and 10 K (float words).
+  - inc/common_s.cuh: the fourth word of the quad-single constants _qs_pi,
+    _qs_2pi, _qs_pi2, _qs_pi4, _qs_pi1024, _qs_3pi4, _qs_e and _qs_log2 was
+    wrong (relative errors up to 1.35e5 u, u = 2^-96).  They are replaced
+    by the correctly rounded float expansions; all 53 constants of
+    common.cuh and common_s.cuh are now within 0.6 u of the exact values
+    (checked against MPFR).
+
 Changes for gdtq 0.0.4
   - New elementary functions for all six classes: the table-driven
     multi-word kernels of the CORE-dtq project (inc/mw/, wrapped by
